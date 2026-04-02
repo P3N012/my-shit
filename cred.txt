@@ -1,6 +1,0 @@
-📋 Test Credentials:
-   Email: test@insightplus.com
-   Password: password123
-
-   Admin Email: admin@insightplus.com
-   Admin Password: admin123
