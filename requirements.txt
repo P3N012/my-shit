@@ -24,6 +24,9 @@ anthropic==0.45.0
 arq==0.26.1
 redis==5.2.1
 
+# Stripe Connect (revenue data source)
+stripe==11.4.1
+
 # Pydantic + EmailStr validator
 pydantic==2.10.3
 pydantic-settings==2.6.1

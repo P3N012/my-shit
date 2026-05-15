@@ -9,6 +9,14 @@ from app.models.ai_job import (
     AIJob,
 )
 from app.models.ai_usage import AIUsage
+from app.models.platform_connection import (
+    CONN_ACTIVE,
+    CONN_DISCONNECTED,
+    CONN_ERROR,
+    PLATFORM_STRIPE,
+    OAuthState,
+    PlatformConnection,
+)
 from app.models.organization import (
     ALL_ROLES,
     ROLE_ADMIN,
@@ -35,4 +43,10 @@ __all__ = [
     "JOB_FAILED",
     "JOB_TERMINAL",
     "AIUsage",
+    "PlatformConnection",
+    "OAuthState",
+    "PLATFORM_STRIPE",
+    "CONN_ACTIVE",
+    "CONN_DISCONNECTED",
+    "CONN_ERROR",
 ]

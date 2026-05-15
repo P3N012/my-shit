@@ -44,20 +44,24 @@ and will be added in dedicated modules as they're built.
 │   │   ├── user.py               # User, RefreshToken
 │   │   ├── organization.py       # Organization, Membership
 │   │   ├── ai_job.py             # AIJob
-│   │   └── ai_usage.py           # AIUsage
+│   │   ├── ai_usage.py           # AIUsage
+│   │   └── platform_connection.py  # PlatformConnection, OAuthState
 │   ├── schemas/
 │   │   ├── auth.py
 │   │   ├── organization.py
-│   │   └── ai.py
+│   │   ├── ai.py
+│   │   └── platform_connection.py
 │   ├── routes/
 │   │   ├── auth.py               # /api/v1/auth/*
 │   │   ├── organizations.py      # /api/v1/orgs/*
-│   │   └── ai.py                 # /api/v1/ai/*
+│   │   ├── ai.py                 # /api/v1/ai/*
+│   │   └── connections.py        # /api/v1/connections/*
 │   ├── services/
 │   │   ├── auth_service.py
 │   │   ├── organization_service.py
 │   │   ├── ai_service.py
-│   │   └── jobs_service.py
+│   │   ├── jobs_service.py
+│   │   └── stripe_oauth_service.py
 │   └── utils/
 │       └── dependencies.py       # get_current_user, get_current_membership, require_role
 ├── scripts/
@@ -69,7 +73,8 @@ and will be added in dedicated modules as they're built.
 │   ├── test_meta.py
 │   ├── test_organizations.py
 │   ├── test_rate_limit.py
-│   └── test_ai.py                # Anthropic SDK is mocked
+│   ├── test_ai.py                # Anthropic SDK is mocked
+│   └── test_connections.py       # Stripe SDK is mocked
 ├── worker.py                     # arq worker entry point
 ├── Dockerfile
 ├── docker-compose.yml
@@ -134,6 +139,11 @@ All config is loaded from environment variables (or `.env`) via
 | `ANTHROPIC_MAX_TOKENS`         | no       | `4096`                   | Default `max_tokens` for completions.          |
 | `AI_ENABLED`                   | no       | `true`                   | Master toggle for `/ai/*`.                     |
 | `REDIS_URL`                    | for jobs | `redis://localhost:6379/0` | arq queue backend for async `/ai/jobs`.       |
+| `STRIPE_SECRET_KEY`            | for Stripe | —                      | Platform secret key (`sk_test_...`). Required to exchange OAuth codes. |
+| `STRIPE_CONNECT_CLIENT_ID`     | for Stripe | —                      | Connect client ID (`ca_...`) from Dashboard → Connect.                 |
+| `STRIPE_OAUTH_REDIRECT_URI`    | no       | `…/connections/stripe/callback` | Must match a Redirect URI in Connect settings exactly.            |
+| `STRIPE_OAUTH_SUCCESS_URL`     | no       | `localhost:3000/connections?stripe=ok` | Where the callback 302s on success.                        |
+| `STRIPE_OAUTH_FAILURE_URL`     | no       | `localhost:3000/connections?stripe=error` | Where the callback 302s on failure.                     |
 
 Generate strong secrets:
 
@@ -164,6 +174,18 @@ Base path: `/api/v1`
 | GET    | `/orgs`        | List orgs the current user belongs to                             |
 | POST   | `/orgs`        | Create a new org (caller becomes `owner`)                         |
 | GET    | `/orgs/{id}`   | Get a specific org (403 if the user has no membership)            |
+
+### Connections (`/connections`) — org-scoped (except the callback)
+
+Stripe Connect OAuth and connected-data-source management.
+
+| Method | Path                              | Description                                                                |
+| ------ | --------------------------------- | -------------------------------------------------------------------------- |
+| POST   | `/connections/stripe/connect`     | Returns a Stripe authorization URL; client navigates the user there.       |
+| GET    | `/connections/stripe/callback`    | Stripe redirects here; **public**, bound to user by one-time state token.  |
+| GET    | `/connections`                    | List the org's connected accounts (tokens never returned).                 |
+| GET    | `/connections/{id}`               | Get one connection.                                                        |
+| DELETE | `/connections/{id}`               | Disconnect: revoke at Stripe (best-effort) and remove the row.             |
 
 ### AI (`/ai`) — org-scoped, requires `X-Organization-Id` header
 
@@ -249,6 +271,8 @@ PR.
 | `Membership`   | `(user_id, organization_id, role)` — `owner` / `admin` / `member`    |
 | `AIJob`        | Lifecycle for an enqueued AI call: `queued`/`running`/`succeeded`/`failed` |
 | `AIUsage`      | One row per Anthropic call — token counts (incl. cache hits) + USD cost |
+| `PlatformConnection` | A connected third-party account (Stripe today; Google Ads/GA4 later). Stores OAuth tokens scoped to one org. |
+| `OAuthState`   | Short-lived CSRF token for the OAuth redirect leg. One-time use, 10-minute TTL. |
 
 ---
 

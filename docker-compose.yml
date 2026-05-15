@@ -39,6 +39,11 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: claude-opus-4-7
       AI_ENABLED: "true"
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_CONNECT_CLIENT_ID: ${STRIPE_CONNECT_CLIENT_ID:-}
+      STRIPE_OAUTH_REDIRECT_URI: ${STRIPE_OAUTH_REDIRECT_URI:-http://localhost:8000/api/v1/connections/stripe/callback}
+      STRIPE_OAUTH_SUCCESS_URL: ${STRIPE_OAUTH_SUCCESS_URL:-http://localhost:3000/connections?stripe=ok}
+      STRIPE_OAUTH_FAILURE_URL: ${STRIPE_OAUTH_FAILURE_URL:-http://localhost:3000/connections?stripe=error}
     ports:
       - "8000:8000"
     depends_on:

@@ -51,6 +51,22 @@ class Settings(BaseSettings):
 
     # Background jobs
     REDIS_URL: str = Field(default="redis://localhost:6379/0", description="Redis URL for arq job queue")
+
+    # Stripe Connect
+    STRIPE_SECRET_KEY: str = Field(default="", description="Your platform's Stripe secret key (sk_test_... or sk_live_...). Used to exchange OAuth codes for connected-account tokens.")
+    STRIPE_CONNECT_CLIENT_ID: str = Field(default="", description="Your Stripe Connect client ID (ca_...) from Stripe Dashboard → Settings → Connect.")
+    STRIPE_OAUTH_REDIRECT_URI: str = Field(
+        default="http://localhost:8000/api/v1/connections/stripe/callback",
+        description="Where Stripe redirects after the user authorizes. Must match a Redirect URI configured in your Stripe Connect settings.",
+    )
+    STRIPE_OAUTH_SUCCESS_URL: str = Field(
+        default="http://localhost:3000/connections?stripe=ok",
+        description="Frontend URL the callback redirects to after a successful connect.",
+    )
+    STRIPE_OAUTH_FAILURE_URL: str = Field(
+        default="http://localhost:3000/connections?stripe=error",
+        description="Frontend URL the callback redirects to on failure.",
+    )
     
     class Config:
         env_file = ".env"
