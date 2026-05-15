@@ -44,10 +44,6 @@ class User(Base):
     
     # Relationships
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
-    platform_connections = relationship("PlatformConnection", back_populates="user", cascade="all, delete-orphan")
-    campaigns = relationship("Campaign", back_populates="user", cascade="all, delete-orphan")
-    insights = relationship("Insight", back_populates="user", cascade="all, delete-orphan")
-    report_preferences = relationship("ReportPreference", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', status='{self.status}')>"

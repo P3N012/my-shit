@@ -62,8 +62,6 @@ nano .env  # or use your preferred editor
 - `DATABASE_URL` - PostgreSQL connection string
 - `ACCESS_TOKEN_SECRET` - JWT secret (generate random string)
 - `REFRESH_TOKEN_SECRET` - JWT secret (generate random string)
-- `GOOGLE_ADS_*` - Google Ads API credentials
-- `META_APP_*` - Meta Ads API credentials
 
 **Generate secure secrets:**
 ```python
@@ -109,14 +107,7 @@ insightplus-backend/
 │   │   ├── database.py        # Database connection
 │   │   └── security.py        # JWT & password hashing
 │   ├── models/                # SQLAlchemy models
-│   │   ├── user.py
-│   │   ├── platform_connection.py
-│   │   ├── campaign.py
-│   │   ├── metric.py
-│   │   ├── sync_log.py
-│   │   ├── analytics_raw.py
-│   │   ├── insight.py
-│   │   └── report_preference.py
+│   │   └── user.py            # User + RefreshToken
 │   ├── schemas/               # Pydantic schemas (request/response)
 │   ├── routes/                # API endpoints
 │   ├── services/              # Business logic
@@ -138,24 +129,11 @@ insightplus-backend/
 ### Core Models:
 - **User** - Authentication & accounts
 - **RefreshToken** - JWT token management
-- **PlatformConnection** - OAuth tokens for Google/Meta Ads
-- **Campaign** - Marketing campaigns
-- **Metric** - Daily performance data
-- **SyncLog** - Sync operation tracking
-- **AnalyticsRaw** - Granular audience data
-- **Insight** - AI-generated alerts
-- **ReportPreference** - Email report settings
 
 ### Relationships:
 ```
 User
-├── RefreshTokens (1:N)
-├── PlatformConnections (1:N)
-│   ├── Campaigns (1:N)
-│   │   └── Metrics (1:N)
-│   └── SyncLogs (1:N)
-├── Insights (1:N)
-└── ReportPreferences (1:N)
+└── RefreshTokens (1:N)
 ```
 
 ---
@@ -166,28 +144,12 @@ User
 - **Access Token**: 30 minutes (for API requests)
 - **Refresh Token**: 30 days (for getting new access tokens)
 
-### Endpoints (to be implemented):
+### Endpoints:
 - `POST /api/v1/auth/register` - Create account
 - `POST /api/v1/auth/login` - Login
 - `POST /api/v1/auth/refresh` - Refresh access token
 - `POST /api/v1/auth/logout` - Logout
 - `GET /api/v1/auth/me` - Get current user
-
----
-
-## 🔗 OAuth Integration
-
-### Supported Platforms:
-- Google Ads
-- Meta Ads (Facebook/Instagram)
-
-### OAuth Flow (to be implemented):
-1. User clicks "Connect Platform"
-2. Redirect to platform OAuth page
-3. User authorizes
-4. Platform redirects back with code
-5. Exchange code for tokens
-6. Store tokens in `platform_connections` table
 
 ---
 
@@ -208,37 +170,14 @@ pytest
 
 ---
 
-## 📊 API Endpoints (Planned)
+## 📊 API Endpoints
 
 ### Authentication
 - `POST /api/v1/auth/register`
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/refresh`
 - `POST /api/v1/auth/logout`
-
-### OAuth
-- `POST /api/v1/oauth/google-ads/connect`
-- `GET /api/v1/oauth/google-ads/callback`
-- `POST /api/v1/oauth/meta-ads/connect`
-- `GET /api/v1/oauth/meta-ads/callback`
-
-### Connections
-- `GET /api/v1/connections`
-- `GET /api/v1/connections/{id}`
-- `POST /api/v1/connections/{id}/sync`
-- `DELETE /api/v1/connections/{id}`
-
-### Campaigns
-- `GET /api/v1/campaigns`
-- `GET /api/v1/campaigns/{id}`
-
-### Dashboard
-- `GET /api/v1/dashboard/overview`
-- `GET /api/v1/dashboard/trends`
-
-### Insights
-- `GET /api/v1/insights`
-- `POST /api/v1/insights/{id}/dismiss`
+- `GET /api/v1/auth/me`
 
 ---
 

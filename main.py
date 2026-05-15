@@ -16,7 +16,7 @@ from app.core.config import settings
 from app.core.database import init_db
 
 # Import routers
-from app.routes import auth, oauth, campaigns, dashboard
+from app.routes import auth
 
 
 @asynccontextmanager
@@ -100,7 +100,3 @@ async def health_check():
 
 # Register API routers
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
-app.include_router(oauth.router, prefix=settings.API_V1_PREFIX)
-app.include_router(oauth.connections_router, prefix=settings.API_V1_PREFIX)
-app.include_router(campaigns.router, prefix=settings.API_V1_PREFIX)
-app.include_router(dashboard.router, prefix=settings.API_V1_PREFIX)

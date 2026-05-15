@@ -28,17 +28,6 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = Field(default="/api/v1", description="API version 1 prefix")
     PROJECT_NAME: str = Field(default="InsightPlus", description="Project name")
     
-    # Google Ads API
-    GOOGLE_ADS_DEVELOPER_TOKEN: str = Field(..., description="Google Ads developer token")
-    GOOGLE_ADS_CLIENT_ID: str = Field(..., description="Google OAuth client ID")
-    GOOGLE_ADS_CLIENT_SECRET: str = Field(..., description="Google OAuth client secret")
-    GOOGLE_ADS_REDIRECT_URI: str = Field(..., description="Google OAuth redirect URI")
-    
-    # Meta Ads API
-    META_APP_ID: str = Field(..., description="Meta (Facebook) app ID")
-    META_APP_SECRET: str = Field(..., description="Meta app secret")
-    META_REDIRECT_URI: str = Field(..., description="Meta OAuth redirect URI")
-    
     # CORS
     CORS_ORIGINS: str = Field(default="http://localhost:3000", description="Allowed CORS origins (comma-separated)")
     
