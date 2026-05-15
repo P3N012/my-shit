@@ -54,36 +54,13 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def init_db() -> None:
-    """
-    Initialize database - create all tables.
-    
-    This should be called once during application startup
-    or via a separate initialization script.
-    
-    Note: In production, use Alembic migrations instead.
-    """
-    # Import all models so they're registered with Base
-    from app.models import (
-        User, RefreshToken, PlatformConnection,
-        Campaign, Metric, SyncLog,
-        AnalyticsRaw, Insight, ReportPreference
-    )
-    
-    # Create all tables
+    """Create all tables. Intended for dev use; introduce migrations before production."""
+    import app.models  # noqa: F401 — register models with Base
     Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created successfully!")
 
 
 def drop_all_tables() -> None:
-    """
-    Drop all tables. 
-    
-    ⚠️  USE WITH CAUTION! 
-    Only use in development for clean slate.
-    NEVER use in production!
-    """
+    """Drop all tables. Refuses to run in production."""
     if settings.is_production:
-        raise RuntimeError("Cannot drop tables in production!")
-    
+        raise RuntimeError("Cannot drop tables in production")
     Base.metadata.drop_all(bind=engine)
-    print("⚠️  All tables dropped!")

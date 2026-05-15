@@ -1,366 +1,310 @@
 # InsightPlus Backend
 
-Marketing Analytics Platform - Backend API
+FastAPI + PostgreSQL backend for the InsightPlus SaaS dashboard.
 
-Built with **FastAPI**, **PostgreSQL**, **SQLAlchemy**
-
----
-
-## 🚀 Quick Start
-
-### 1. Prerequisites
-
-- Python 3.9+
-- PostgreSQL 13+
-- pip
-- virtualenv (recommended)
-
-### 2. Installation
-
-```bash
-# Clone/navigate to project
-cd insightplus-backend
-
-# Create virtual environment
-python -m venv venv
-
-# Activate virtual environment
-# Windows:
-venv\Scripts\activate
-# Mac/Linux:
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### 3. Database Setup
-
-```bash
-# Create PostgreSQL database
-createdb insightplus_dev
-
-# Or with specific user:
-psql -U postgres
-CREATE DATABASE insightplus_dev;
-CREATE USER insightplus_user WITH PASSWORD 'your_password';
-GRANT ALL PRIVILEGES ON DATABASE insightplus_dev TO insightplus_user;
-\q
-```
-
-### 4. Environment Configuration
-
-```bash
-# Copy example env file
-cp .env.example .env
-
-# Edit .env with your values
-nano .env  # or use your preferred editor
-```
-
-**Required .env variables:**
-- `DATABASE_URL` - PostgreSQL connection string
-- `ACCESS_TOKEN_SECRET` - JWT secret (generate random string)
-- `REFRESH_TOKEN_SECRET` - JWT secret (generate random string)
-- `GOOGLE_ADS_*` - Google Ads API credentials
-- `META_APP_*` - Meta Ads API credentials
-
-**Generate secure secrets:**
-```python
-import secrets
-print(secrets.token_urlsafe(32))
-```
-
-### 5. Initialize Database
-
-```bash
-# Create tables
-python scripts/init_db.py
-
-# Seed with test data
-python scripts/seed_db.py
-```
-
-### 6. Run Server
-
-```bash
-# Development mode (auto-reload)
-python main.py
-
-# Or with uvicorn directly:
-uvicorn app.main:app --reload
-
-# Server runs on: http://localhost:8000
-```
-
-### 7. Test API
-
-Visit: `http://localhost:8000/docs` for interactive API documentation (Swagger UI)
+Provides user accounts and JWT-based authentication. Product features
+(dashboard, analytics, integrations) are intentionally out of scope here
+and will be added in dedicated modules as they're built.
 
 ---
 
-## 📁 Project Structure
+## Stack
+
+| Layer          | Choice                            |
+| -------------- | --------------------------------- |
+| Web framework  | FastAPI                           |
+| ORM            | SQLAlchemy 2.x                    |
+| Database       | PostgreSQL (SQLite for local dev) |
+| Auth           | JWT (HS256), bcrypt for passwords |
+| Config         | Pydantic Settings                 |
+| Python         | 3.9+                              |
+
+---
+
+## Project layout
 
 ```
-insightplus-backend/
+.
+├── main.py                       # FastAPI app + entry point
+├── requirements.txt
+├── alembic.ini
+├── alembic/                      # Migrations
+│   ├── env.py
+│   └── versions/
 ├── app/
-│   ├── core/                  # Core configuration
-│   │   ├── config.py          # Settings management
-│   │   ├── database.py        # Database connection
-│   │   └── security.py        # JWT & password hashing
-│   ├── models/                # SQLAlchemy models
-│   │   ├── user.py
-│   │   ├── platform_connection.py
-│   │   ├── campaign.py
-│   │   ├── metric.py
-│   │   ├── sync_log.py
-│   │   ├── analytics_raw.py
-│   │   ├── insight.py
-│   │   └── report_preference.py
-│   ├── schemas/               # Pydantic schemas (request/response)
-│   ├── routes/                # API endpoints
-│   ├── services/              # Business logic
-│   └── main.py                # FastAPI app
+│   ├── core/
+│   │   ├── config.py             # Settings (env-driven)
+│   │   ├── database.py           # Engine, session, Base
+│   │   ├── limiter.py            # Shared slowapi limiter
+│   │   ├── logging.py            # JSON / human formatters + request_id contextvar
+│   │   ├── middleware.py         # RequestContextMiddleware
+│   │   └── security.py           # Password hashing, JWT, token hashing
+│   ├── models/
+│   │   ├── user.py               # User, RefreshToken
+│   │   └── organization.py       # Organization, Membership
+│   ├── schemas/
+│   │   ├── auth.py
+│   │   └── organization.py
+│   ├── routes/
+│   │   ├── auth.py               # /api/v1/auth/*
+│   │   └── organizations.py      # /api/v1/orgs/*
+│   ├── services/
+│   │   ├── auth_service.py
+│   │   └── organization_service.py
+│   └── utils/
+│       └── dependencies.py       # get_current_user, get_current_membership, require_role
 ├── scripts/
-│   ├── init_db.py             # Create database tables
-│   └── seed_db.py             # Seed test data
-├── tests/                     # Unit tests
-├── main.py                    # Server entry point
-├── requirements.txt           # Dependencies
-├── .env.example               # Environment template
-└── README.md                  # This file
+│   └── seed_db.py                # Seed test users
+├── tests/
+│   ├── conftest.py               # Shared fixtures (per-test SQLite)
+│   ├── test_auth.py
+│   ├── test_cors.py
+│   ├── test_meta.py
+│   ├── test_organizations.py
+│   └── test_rate_limit.py
+├── Dockerfile
+├── docker-compose.yml
+├── .env.example
+└── .github/workflows/ci.yml      # pytest + Alembic-against-Postgres
 ```
 
 ---
 
-## 🗄️ Database Models
+## Quick start
 
-### Core Models:
-- **User** - Authentication & accounts
-- **RefreshToken** - JWT token management
-- **PlatformConnection** - OAuth tokens for Google/Meta Ads
-- **Campaign** - Marketing campaigns
-- **Metric** - Daily performance data
-- **SyncLog** - Sync operation tracking
-- **AnalyticsRaw** - Granular audience data
-- **Insight** - AI-generated alerts
-- **ReportPreference** - Email report settings
+### Option A — Docker Compose (recommended)
 
-### Relationships:
-```
-User
-├── RefreshTokens (1:N)
-├── PlatformConnections (1:N)
-│   ├── Campaigns (1:N)
-│   │   └── Metrics (1:N)
-│   └── SyncLogs (1:N)
-├── Insights (1:N)
-└── ReportPreferences (1:N)
-```
-
----
-
-## 🔐 Authentication
-
-### JWT Token System:
-- **Access Token**: 30 minutes (for API requests)
-- **Refresh Token**: 30 days (for getting new access tokens)
-
-### Endpoints (to be implemented):
-- `POST /api/v1/auth/register` - Create account
-- `POST /api/v1/auth/login` - Login
-- `POST /api/v1/auth/refresh` - Refresh access token
-- `POST /api/v1/auth/logout` - Logout
-- `GET /api/v1/auth/me` - Get current user
-
----
-
-## 🔗 OAuth Integration
-
-### Supported Platforms:
-- Google Ads
-- Meta Ads (Facebook/Instagram)
-
-### OAuth Flow (to be implemented):
-1. User clicks "Connect Platform"
-2. Redirect to platform OAuth page
-3. User authorizes
-4. Platform redirects back with code
-5. Exchange code for tokens
-6. Store tokens in `platform_connections` table
-
----
-
-## 🧪 Testing
-
-### Test Credentials (after seeding):
-- **Email**: `test@insightplus.com`
-- **Password**: `password123`
-
-### Test Admin:
-- **Email**: `admin@insightplus.com`
-- **Password**: `admin123`
-
-### Run Tests (when implemented):
 ```bash
-pytest
+cp .env.example .env                       # optional; compose has sensible defaults
+docker compose up --build
 ```
 
----
+Brings up Postgres + the API, runs migrations, exposes the API on
+`http://localhost:8000`. Swagger UI at `/api/v1/docs`.
 
-## 📊 API Endpoints (Planned)
+### Option B — Local Python
 
-### Authentication
-- `POST /api/v1/auth/register`
-- `POST /api/v1/auth/login`
-- `POST /api/v1/auth/refresh`
-- `POST /api/v1/auth/logout`
-
-### OAuth
-- `POST /api/v1/oauth/google-ads/connect`
-- `GET /api/v1/oauth/google-ads/callback`
-- `POST /api/v1/oauth/meta-ads/connect`
-- `GET /api/v1/oauth/meta-ads/callback`
-
-### Connections
-- `GET /api/v1/connections`
-- `GET /api/v1/connections/{id}`
-- `POST /api/v1/connections/{id}/sync`
-- `DELETE /api/v1/connections/{id}`
-
-### Campaigns
-- `GET /api/v1/campaigns`
-- `GET /api/v1/campaigns/{id}`
-
-### Dashboard
-- `GET /api/v1/dashboard/overview`
-- `GET /api/v1/dashboard/trends`
-
-### Insights
-- `GET /api/v1/insights`
-- `POST /api/v1/insights/{id}/dismiss`
-
----
-
-## 🛠️ Development
-
-### Run in Development Mode:
 ```bash
-# Auto-reload on code changes
-python main.py
-
-# Or
-uvicorn app.main:app --reload
+python -m venv venv && source venv/bin/activate     # (Windows: venv\Scripts\activate)
+pip install -r requirements.txt
+cp .env.example .env                                # then edit (see Configuration)
+alembic upgrade head                                # apply migrations
+python scripts/seed_db.py                           # optional: test users
+python main.py                                      # http://localhost:8000
 ```
 
-### Database Migrations (Alembic):
+---
+
+## Configuration
+
+All config is loaded from environment variables (or `.env`) via
+`app/core/config.py`.
+
+| Variable                       | Required | Default                  | Notes                                          |
+| ------------------------------ | -------- | ------------------------ | ---------------------------------------------- |
+| `DATABASE_URL`                 | yes      | —                        | e.g. `postgresql://user:pw@localhost/insight`  |
+| `ACCESS_TOKEN_SECRET`          | yes      | —                        | High-entropy random string                     |
+| `REFRESH_TOKEN_SECRET`         | yes      | —                        | Different from access secret                   |
+| `ACCESS_TOKEN_EXPIRE_MINUTES`  | no       | `30`                     |                                                |
+| `REFRESH_TOKEN_EXPIRE_DAYS`    | no       | `30`                     |                                                |
+| `ALGORITHM`                    | no       | `HS256`                  |                                                |
+| `ENVIRONMENT`                  | no       | `development`            | `development` \| `staging` \| `production`     |
+| `API_V1_PREFIX`                | no       | `/api/v1`                |                                                |
+| `PROJECT_NAME`                 | no       | `InsightPlus`            |                                                |
+| `CORS_ORIGINS`                 | no       | `http://localhost:3000`  | Comma-separated. **Never `*` with cookies.**   |
+| `HOST`                         | no       | `0.0.0.0`                |                                                |
+| `PORT`                         | no       | `8000`                   |                                                |
+| `LOG_LEVEL`                    | no       | `INFO`                   |                                                |
+| `RATE_LIMIT_ENABLED`           | no       | `true`                   | Set `false` in test environments               |
+| `RATE_LIMIT_LOGIN`             | no       | `5/minute`               | Per-IP                                         |
+| `RATE_LIMIT_REGISTER`          | no       | `5/minute`               | Per-IP                                         |
+| `RATE_LIMIT_REFRESH`           | no       | `20/minute`              | Per-IP                                         |
+
+Generate strong secrets:
+
 ```bash
-# Create migration
-alembic revision --autogenerate -m "description"
-
-# Run migrations
-alembic upgrade head
-
-# Rollback
-alembic downgrade -1
+python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
-
-### Code Style:
-- Follow PEP 8
-- Use type hints
-- Add docstrings to functions
-- Keep functions small and focused
 
 ---
 
-## 🚨 Common Issues
+## API
 
-### Issue 1: "ModuleNotFoundError"
+Base path: `/api/v1`
+
+### Authentication (`/auth`)
+
+| Method | Path             | Description                                                          |
+| ------ | ---------------- | -------------------------------------------------------------------- |
+| POST   | `/auth/register` | Create an account (auto-provisions a personal organization)          |
+| POST   | `/auth/login`    | Exchange credentials for an access + refresh token pair              |
+| POST   | `/auth/refresh`  | **Rotates** the refresh token; returns a new access + refresh pair   |
+| POST   | `/auth/logout`   | Revoke a refresh token                                               |
+| GET    | `/auth/me`       | Current user + memberships (requires `Authorization: Bearer <token>`) |
+
+### Organizations (`/orgs`)
+
+| Method | Path           | Description                                                       |
+| ------ | -------------- | ----------------------------------------------------------------- |
+| GET    | `/orgs`        | List orgs the current user belongs to                             |
+| POST   | `/orgs`        | Create a new org (caller becomes `owner`)                         |
+| GET    | `/orgs/{id}`   | Get a specific org (403 if the user has no membership)            |
+
+### Meta
+
+| Method | Path      | Description                                                              |
+| ------ | --------- | ------------------------------------------------------------------------ |
+| GET    | `/`       | Welcome payload                                                          |
+| GET    | `/health` | **Liveness** — the process is up                                         |
+| GET    | `/ready`  | **Readiness** — process is up *and* `SELECT 1` against the DB succeeded  |
+
+Every response carries an `X-Request-Id` header (echoing the client's if
+provided, otherwise a fresh UUID4) and every log line for that request
+includes it.
+
+---
+
+## Authentication model
+
+- **Access token** — short-lived JWT (default 30 min). Sent as
+  `Authorization: Bearer <token>`. Stateless: not stored server-side.
+- **Refresh token** — long-lived JWT (default 30 days). Stored as a
+  **SHA-256 hash** in the `refresh_tokens` table, never as plaintext.
+- **Rotation** — every call to `/auth/refresh` revokes the presented
+  refresh token and issues a new one. Clients must replace **both**
+  tokens on every refresh.
+- **Logout** — deletes the corresponding refresh-token row. Outstanding
+  access tokens remain valid until their natural expiry.
+
+## Multi-tenancy
+
+Every authenticated request that touches tenant data must declare which
+organization it's acting against:
+
+```
+Authorization:       Bearer <access_token>
+X-Organization-Id:   42
+```
+
+Org-scoped endpoints take a `Membership` via the
+`get_current_membership` FastAPI dependency, which:
+
+1. Resolves the user from the JWT (`get_current_user`).
+2. Reads `X-Organization-Id` (400 if missing).
+3. Looks up the `(user_id, organization_id)` membership row (403 if absent).
+4. Returns the `Membership` — its `role` is then available for further
+   authorization via the `require_role("owner", "admin", …)` factory.
+
+Registering a user auto-creates a personal organization with that user
+as `owner`. There is always at least one org per user.
+
+---
+
+## Database
+
+Schema is managed by **Alembic**. Migrations live under `alembic/versions/`.
+
 ```bash
-# Make sure virtual environment is activated
-source venv/bin/activate  # Mac/Linux
-venv\Scripts\activate     # Windows
+alembic upgrade head                        # apply all migrations
+alembic revision --autogenerate -m "..."    # generate a new migration
+alembic downgrade -1                        # roll back one
+alembic current                             # show current revision
 ```
 
-### Issue 2: "database does not exist"
+The app does **not** create tables at startup; running migrations is
+explicit. CI verifies migrations apply cleanly against Postgres on every
+PR.
+
+### Models
+
+| Model          | Purpose                                                       |
+| -------------- | ------------------------------------------------------------- |
+| `User`         | Account, password hash, status, subscription metadata         |
+| `RefreshToken` | Hash + expiry of an issued refresh JWT, scoped to a `User`    |
+| `Organization` | Tenant; everything user-data lives under an org               |
+| `Membership`   | `(user_id, organization_id, role)` — `owner` / `admin` / `member` |
+
+---
+
+## Seeded test credentials
+
+After running `python scripts/seed_db.py`:
+
+| Role  | Email                      | Password       |
+| ----- | -------------------------- | -------------- |
+| User  | `test@insightplus.com`     | `password123`  |
+| Admin | `admin@insightplus.com`    | `admin123`     |
+
+These are obviously not for production.
+
+---
+
+## Development
+
 ```bash
-# Create database
-createdb insightplus_dev
+python main.py                                # auto-reload in dev
+uvicorn main:app --reload                     # equivalent
+pytest                                        # run the test suite
+pytest -k auth                                # filter
 ```
 
-### Issue 3: "password authentication failed"
-```bash
-# Check DATABASE_URL in .env
-# Make sure username, password match PostgreSQL
-```
+CI (GitHub Actions, `.github/workflows/ci.yml`) on every PR:
 
-### Issue 4: "Cannot connect to database"
-```bash
-# Check if PostgreSQL is running
-pg_isready
+- applies Alembic migrations against a real Postgres service
+- runs `pytest` (which uses SQLite per-test via `conftest.py`)
 
-# Start PostgreSQL (depends on OS)
-# Mac: brew services start postgresql
-# Linux: sudo service postgresql start
-```
+### Style
+
+- PEP 8, type hints on public functions.
+- Comments only where the *why* isn't obvious from the code.
 
 ---
 
-## 📝 Environment Variables
+## Troubleshooting
 
-See `.env.example` for all required variables.
-
-**Security Note:**
-- Never commit `.env` to git
-- Use strong random secrets in production
-- Rotate secrets regularly
-
----
-
-## 🚀 Deployment (Later)
-
-### Production Checklist:
-- [ ] Set `ENVIRONMENT=production` in .env
-- [ ] Use secure random secrets
-- [ ] Enable HTTPS
-- [ ] Set up database backups
-- [ ] Configure logging
-- [ ] Set up monitoring
-- [ ] Use production-grade server (gunicorn)
+| Symptom                          | Fix                                                              |
+| -------------------------------- | ---------------------------------------------------------------- |
+| `ModuleNotFoundError`            | Virtualenv not activated, or `pip install -r requirements.txt`   |
+| `database "insightplus_dev" does not exist` | `createdb insightplus_dev`                            |
+| `password authentication failed` | Check `DATABASE_URL` in `.env`                                   |
+| `connection refused`             | Postgres not running (`pg_isready`)                              |
 
 ---
 
-## 📚 Documentation
+## Operations
 
-- FastAPI Docs: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-- OpenAPI JSON: http://localhost:8000/api/v1/openapi.json
-
----
-
-## 🤝 Contributing
-
-1. Create feature branch
-2. Make changes
-3. Write tests
-4. Submit pull request
-
----
-
-## 📄 License
-
-Proprietary - All Rights Reserved
-
----
-
-## 🆘 Need Help?
-
-- Check this README
-- Review code comments
-- Check FastAPI docs: https://fastapi.tiangolo.com/
-- Check SQLAlchemy docs: https://docs.sqlalchemy.org/
+- **Logging.** Single root logger configured at startup. JSON output
+  (one object per line) in non-development environments, compact
+  human-readable output in `development`. Every record emitted while
+  handling a request carries the request's `request_id`.
+- **Request IDs.** `RequestContextMiddleware` assigns each request a
+  UUID4 (or honours an upstream `X-Request-Id`), stashes it in a
+  `ContextVar` for downstream logs, echoes it back on the response, and
+  emits one access log per request.
+- **Rate limiting.** `slowapi`, keyed by remote address. Defaults are
+  `5/min` for register and login, `20/min` for refresh. Tune via env
+  vars. Behind a reverse proxy, ensure the proxy sets the real client
+  IP upstream (e.g. nginx `proxy_set_header X-Real-IP`).
+- **Health probes.** `/health` for kubelet/load-balancer liveness;
+  `/ready` for readiness (returns 503 when the database is unreachable).
+- **Docker.** Multi-stage `Dockerfile` (builder installs deps system-wide
+  with `--prefix=/install`, runtime image runs as a non-root user). The
+  default `CMD` runs `alembic upgrade head` before launching uvicorn.
 
 ---
 
-**Built with ❤️ for InsightPlus**
-P3N
+## Security notes
+
+- `.env` is gitignored. Never commit secrets.
+- Use strong random values for `ACCESS_TOKEN_SECRET` and
+  `REFRESH_TOKEN_SECRET`. They must be distinct.
+- `CORS_ORIGINS` is a strict allowlist; the wildcard `*` is rejected when
+  `allow_credentials=True` (per CORS spec) and should not be used.
+- Refresh tokens are hashed at rest. A leaked DB row cannot be replayed
+  as a valid token.
+
+---
+
+## License
+
+Proprietary — all rights reserved.

@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: insight
+      POSTGRES_PASSWORD: insight
+      POSTGRES_DB: insight
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U insight"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg2://insight:insight@db:5432/insight
+      ACCESS_TOKEN_SECRET: dev-access-secret-do-not-use-in-prod
+      REFRESH_TOKEN_SECRET: dev-refresh-secret-do-not-use-in-prod
+      ENVIRONMENT: development
+      CORS_ORIGINS: http://localhost:3000,http://localhost:5173
+      LOG_LEVEL: INFO
+      RATE_LIMIT_ENABLED: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+
+volumes:
+  pgdata:

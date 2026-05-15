@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: insight
+          POSTGRES_PASSWORD: insight
+          POSTGRES_DB: insight_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U insight"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # pytest runs against SQLite via the conftest fixtures; the value
+      # here just satisfies settings validation at import time.
+      DATABASE_URL: sqlite:///./ci_placeholder.db
+      ACCESS_TOKEN_SECRET: ci-access-secret
+      REFRESH_TOKEN_SECRET: ci-refresh-secret
+      ENVIRONMENT: test
+      CORS_ORIGINS: http://localhost:3000,http://localhost:5173
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify Alembic migrations apply cleanly (Postgres)
+        env:
+          DATABASE_URL: postgresql+psycopg2://insight:insight@localhost:5432/insight_test
+        run: |
+          alembic upgrade head
+          alembic current
+
+      - name: Run pytest
+        run: pytest -v

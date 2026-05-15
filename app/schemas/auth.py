@@ -5,8 +5,10 @@ Pydantic models for request/response validation in auth endpoints.
 """
 
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import List, Optional
 from datetime import datetime
+
+from app.schemas.organization import MembershipResponse
 
 
 # ============================================================================
@@ -116,21 +118,10 @@ class UserResponse(BaseModel):
     subscription_tier: str
     subscription_status: str
     created_at: datetime
-    
+    memberships: List[MembershipResponse] = []
+
     class Config:
         from_attributes = True
-        json_schema_extra = {
-            "example": {
-                "id": 1,
-                "email": "user@example.com",
-                "username": "johndoe",
-                "is_admin": False,
-                "status": "active",
-                "subscription_tier": "starter",
-                "subscription_status": "trial",
-                "created_at": "2026-02-27T10:30:00"
-            }
-        }
 
 
 # ============================================================================

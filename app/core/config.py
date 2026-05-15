@@ -28,23 +28,19 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = Field(default="/api/v1", description="API version 1 prefix")
     PROJECT_NAME: str = Field(default="InsightPlus", description="Project name")
     
-    # Google Ads API
-    GOOGLE_ADS_DEVELOPER_TOKEN: str = Field(..., description="Google Ads developer token")
-    GOOGLE_ADS_CLIENT_ID: str = Field(..., description="Google OAuth client ID")
-    GOOGLE_ADS_CLIENT_SECRET: str = Field(..., description="Google OAuth client secret")
-    GOOGLE_ADS_REDIRECT_URI: str = Field(..., description="Google OAuth redirect URI")
-    
-    # Meta Ads API
-    META_APP_ID: str = Field(..., description="Meta (Facebook) app ID")
-    META_APP_SECRET: str = Field(..., description="Meta app secret")
-    META_REDIRECT_URI: str = Field(..., description="Meta OAuth redirect URI")
-    
     # CORS
     CORS_ORIGINS: str = Field(default="http://localhost:3000", description="Allowed CORS origins (comma-separated)")
-    
+
     # Server
     HOST: str = Field(default="0.0.0.0", description="Server host")
     PORT: int = Field(default=8000, description="Server port")
+
+    # Observability + rate limiting
+    LOG_LEVEL: str = Field(default="INFO", description="Root log level")
+    RATE_LIMIT_ENABLED: bool = Field(default=True, description="Toggle slowapi rate limits globally")
+    RATE_LIMIT_LOGIN: str = Field(default="5/minute", description="Per-IP login rate limit")
+    RATE_LIMIT_REGISTER: str = Field(default="5/minute", description="Per-IP register rate limit")
+    RATE_LIMIT_REFRESH: str = Field(default="20/minute", description="Per-IP refresh rate limit")
     
     class Config:
         env_file = ".env"

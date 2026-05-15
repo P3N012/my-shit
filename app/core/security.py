@@ -1,198 +1,104 @@
 """
 Security utilities
 
-Handles:
 - Password hashing and verification (bcrypt)
-- JWT token creation and verification
-- Token payload management
+- JWT access/refresh token creation and decoding
+- Opaque-token hashing for at-rest storage of refresh tokens
 """
 
-from datetime import datetime, timedelta
+import hashlib
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
+
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from app.core.config import settings
 
-# Password hashing context
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-# ============================================================================
-# Password Hashing
-# ============================================================================
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+# ---------------------------------------------------------------------------
+# Passwords
+# ---------------------------------------------------------------------------
 
 def hash_password(password: str) -> str:
-    """
-    Hash a password using bcrypt.
-    
-    Args:
-        password: Plain text password
-        
-    Returns:
-        Hashed password string
-    """
     return pwd_context.hash(password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """
-    Verify a password against its hash.
-    
-    Args:
-        plain_password: Plain text password to verify
-        hashed_password: Hashed password to check against
-        
-    Returns:
-        True if password matches, False otherwise
-    """
     return pwd_context.verify(plain_password, hashed_password)
 
 
-# ============================================================================
-# JWT Token Management
-# ============================================================================
+# ---------------------------------------------------------------------------
+# JWTs
+# ---------------------------------------------------------------------------
+
+def _encode(data: Dict[str, Any], secret: str, expires: timedelta) -> str:
+    now = _utcnow()
+    to_encode = data.copy()
+    to_encode["iat"] = now
+    to_encode["exp"] = now + expires
+    # jti makes two tokens issued in the same second distinct (otherwise
+    # back-to-back logins produce identical refresh JWTs).
+    to_encode["jti"] = secrets.token_urlsafe(16)
+    return jwt.encode(to_encode, secret, algorithm=settings.ALGORITHM)
+
 
 def create_access_token(
     data: Dict[str, Any],
-    expires_delta: Optional[timedelta] = None
+    expires_delta: Optional[timedelta] = None,
 ) -> str:
-    """
-    Create a JWT access token.
-    
-    Args:
-        data: Data to encode in token (typically {"sub": user_id})
-        expires_delta: Optional custom expiration time
-        
-    Returns:
-        Encoded JWT token string
-    """
-    to_encode = data.copy()
-    
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(
-            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-        )
-    
-    to_encode.update({"exp": expire})
-    
-    encoded_jwt = jwt.encode(
-        to_encode,
-        settings.ACCESS_TOKEN_SECRET,
-        algorithm=settings.ALGORITHM
-    )
-    
-    return encoded_jwt
+    expires = expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    return _encode(data, settings.ACCESS_TOKEN_SECRET, expires)
 
 
 def create_refresh_token(
     data: Dict[str, Any],
-    expires_delta: Optional[timedelta] = None
+    expires_delta: Optional[timedelta] = None,
 ) -> str:
-    """
-    Create a JWT refresh token.
-    
-    Args:
-        data: Data to encode in token (typically {"sub": user_id})
-        expires_delta: Optional custom expiration time
-        
-    Returns:
-        Encoded JWT token string
-    """
-    to_encode = data.copy()
-    
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(
-            days=settings.REFRESH_TOKEN_EXPIRE_DAYS
-        )
-    
-    to_encode.update({"exp": expire})
-    
-    encoded_jwt = jwt.encode(
-        to_encode,
-        settings.REFRESH_TOKEN_SECRET,
-        algorithm=settings.ALGORITHM
-    )
-    
-    return encoded_jwt
+    expires = expires_delta or timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    return _encode(data, settings.REFRESH_TOKEN_SECRET, expires)
 
 
 def decode_token(token: str, secret: str) -> Optional[Dict[str, Any]]:
-    """
-    Decode and verify a JWT token.
-    
-    Args:
-        token: JWT token string
-        secret: Secret key to verify with
-        
-    Returns:
-        Decoded payload dict if valid, None if invalid/expired
-    """
     try:
-        payload = jwt.decode(
-            token,
-            secret,
-            algorithms=[settings.ALGORITHM]
-        )
-        return payload
+        return jwt.decode(token, secret, algorithms=[settings.ALGORITHM])
     except JWTError:
         return None
 
 
 def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
-    """
-    Decode an access token.
-    
-    Args:
-        token: Access token string
-        
-    Returns:
-        Decoded payload if valid, None otherwise
-    """
     return decode_token(token, settings.ACCESS_TOKEN_SECRET)
 
 
 def decode_refresh_token(token: str) -> Optional[Dict[str, Any]]:
-    """
-    Decode a refresh token.
-    
-    Args:
-        token: Refresh token string
-        
-    Returns:
-        Decoded payload if valid, None otherwise
-    """
     return decode_token(token, settings.REFRESH_TOKEN_SECRET)
 
 
 def get_user_id_from_token(token: str, is_refresh: bool = False) -> Optional[int]:
-    """
-    Extract user ID from a token.
-    
-    Args:
-        token: JWT token string
-        is_refresh: True if refresh token, False if access token
-        
-    Returns:
-        User ID as integer if valid, None otherwise
-    """
-    if is_refresh:
-        payload = decode_refresh_token(token)
-    else:
-        payload = decode_access_token(token)
-    
-    if payload is None:
+    payload = decode_refresh_token(token) if is_refresh else decode_access_token(token)
+    if not payload:
         return None
-    
-    user_id_str = payload.get("sub")
-    if user_id_str is None:
-        return None
-    
+    sub = payload.get("sub")
     try:
-        return int(user_id_str)
+        return int(sub) if sub is not None else None
     except (ValueError, TypeError):
         return None
+
+
+# ---------------------------------------------------------------------------
+# Opaque-token hashing (refresh tokens at rest)
+# ---------------------------------------------------------------------------
+# Refresh tokens are high-entropy JWTs, so a fast hash (sha256) is sufficient
+# and avoids paying bcrypt cost on every refresh. The DB only ever stores the
+# hash; a leaked DB row cannot be replayed as a valid token.
+
+def hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()

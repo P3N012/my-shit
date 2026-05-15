@@ -1,217 +1,148 @@
 """
-Authentication Service
-
-Business logic for user authentication:
-- User registration
-- User login
-- Token management
-- User lookup
+Authentication service: registration, login, token issuing, refresh rotation.
 """
 
-from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 
-from app.models.user import User, RefreshToken
-from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
+from sqlalchemy.orm import Session
+
 from app.core.config import settings
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    hash_password,
+    hash_token,
+    verify_password,
+)
+from app.models.organization import ROLE_OWNER, Membership, Organization
+from app.models.user import RefreshToken, User
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class AuthService:
-    """Service for handling authentication operations"""
-    
+    """Authentication operations."""
+
     @staticmethod
     def register_user(
         db: Session,
         email: str,
         username: str,
-        password: str
+        password: str,
     ) -> User:
         """
-        Register a new user.
-        
-        Args:
-            db: Database session
-            email: User email
-            username: Username
-            password: Plain text password
-            
-        Returns:
-            Created User object
-            
-        Raises:
-            ValueError: If email or username already exists
+        Create a user and their personal organization in one transaction.
+
+        Every user is the owner of at least one org. Subsequent org-scoped
+        endpoints can rely on the existence of at least one membership.
         """
-        # Check if email already exists
-        existing_email = db.query(User).filter(User.email == email).first()
-        if existing_email:
+        if db.query(User).filter(User.email == email).first():
             raise ValueError("Email already registered")
-        
-        # Check if username already exists
-        existing_username = db.query(User).filter(User.username == username).first()
-        if existing_username:
+        if db.query(User).filter(User.username == username).first():
             raise ValueError("Username already taken")
-        
-        # Hash password
-        hashed_password = hash_password(password)
-        
-        # Create user
+
         user = User(
             email=email,
             username=username,
-            password=hashed_password,
+            password_hash=hash_password(password),
             status="active",
             subscription_tier="starter",
             subscription_status="trial",
-            trial_ends_at=datetime.utcnow() + timedelta(days=14)  # 14-day trial
+            trial_ends_at=_utcnow() + timedelta(days=14),
         )
-        
         db.add(user)
+        db.flush()  # need user.id for the membership
+
+        org = Organization(name=f"{username}'s workspace")
+        db.add(org)
+        db.flush()
+
+        db.add(
+            Membership(
+                user_id=user.id,
+                organization_id=org.id,
+                role=ROLE_OWNER,
+            )
+        )
         db.commit()
         db.refresh(user)
-        
         return user
-    
+
     @staticmethod
     def authenticate_user(
         db: Session,
         email: str,
-        password: str
+        password: str,
     ) -> Optional[User]:
-        """
-        Authenticate a user by email and password.
-        
-        Args:
-            db: Database session
-            email: User email
-            password: Plain text password
-            
-        Returns:
-            User object if credentials valid, None otherwise
-        """
-        # Find user by email
         user = db.query(User).filter(User.email == email).first()
-        
-        if not user:
+        if not user or user.status != "active":
             return None
-        
-        # Check if account is active
-        if user.status != "active":
+        if not verify_password(password, user.password_hash):
             return None
-        
-        # Verify password
-        if not verify_password(password, user.password):
-            return None
-        
         return user
-    
+
     @staticmethod
-    def create_tokens(
-        db: Session,
-        user_id: int
-    ) -> Tuple[str, str]:
-        """
-        Create access and refresh tokens for a user.
-        
-        Args:
-            db: Database session
-            user_id: User ID
-            
-        Returns:
-            Tuple of (access_token, refresh_token)
-        """
-        # Create access token
+    def issue_tokens(db: Session, user_id: int) -> Tuple[str, str]:
+        """Issue a new access + refresh token pair and persist the refresh hash."""
         access_token = create_access_token(data={"sub": str(user_id)})
-        
-        # Create refresh token
         refresh_token = create_refresh_token(data={"sub": str(user_id)})
-        
-        # Store refresh token in database
-        expires_at = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-        
-        db_refresh_token = RefreshToken(
-            token=refresh_token,
-            user_id=user_id,
-            expires_at=expires_at
+
+        db.add(
+            RefreshToken(
+                token_hash=hash_token(refresh_token),
+                user_id=user_id,
+                expires_at=_utcnow()
+                + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+            )
         )
-        
-        db.add(db_refresh_token)
         db.commit()
-        
+
         return access_token, refresh_token
-    
+
     @staticmethod
-    def verify_refresh_token(
+    def rotate_refresh_token(
         db: Session,
-        refresh_token: str
-    ) -> Optional[int]:
+        refresh_token: str,
+    ) -> Optional[Tuple[str, str]]:
         """
-        Verify a refresh token and return user ID.
-        
-        Args:
-            db: Database session
-            refresh_token: Refresh token string
-            
-        Returns:
-            User ID if token valid, None otherwise
+        Validate a refresh token, revoke it, and issue a new pair.
+
+        Returns (access_token, refresh_token) on success, None if the
+        presented token is unknown or expired. The expiry comparison runs
+        in SQL so it works the same on Postgres and SQLite.
         """
-        # Look up token in database
-        db_token = db.query(RefreshToken).filter(
-            RefreshToken.token == refresh_token
-        ).first()
-        
-        if not db_token:
+        existing = (
+            db.query(RefreshToken)
+            .filter(
+                RefreshToken.token_hash == hash_token(refresh_token),
+                RefreshToken.expires_at > _utcnow(),
+            )
+            .first()
+        )
+        if not existing:
             return None
-        
-        # Check if expired
-        if db_token.expires_at < datetime.utcnow():
-            # Delete expired token
-            db.delete(db_token)
-            db.commit()
-            return None
-        
-        return db_token.user_id
-    
+
+        user_id = existing.user_id
+        db.delete(existing)
+        # issue_tokens commits; this commits the deletion too.
+        return AuthService.issue_tokens(db, user_id)
+
     @staticmethod
-    def revoke_refresh_token(
-        db: Session,
-        refresh_token: str
-    ) -> bool:
-        """
-        Revoke (delete) a refresh token (for logout).
-        
-        Args:
-            db: Database session
-            refresh_token: Refresh token to revoke
-            
-        Returns:
-            True if token was revoked, False if not found
-        """
-        db_token = db.query(RefreshToken).filter(
-            RefreshToken.token == refresh_token
-        ).first()
-        
-        if not db_token:
+    def revoke_refresh_token(db: Session, refresh_token: str) -> bool:
+        existing = (
+            db.query(RefreshToken)
+            .filter(RefreshToken.token_hash == hash_token(refresh_token))
+            .first()
+        )
+        if not existing:
             return False
-        
-        db.delete(db_token)
+        db.delete(existing)
         db.commit()
-        
         return True
-    
+
     @staticmethod
-    def get_user_by_id(
-        db: Session,
-        user_id: int
-    ) -> Optional[User]:
-        """
-        Get user by ID.
-        
-        Args:
-            db: Database session
-            user_id: User ID
-            
-        Returns:
-            User object if found, None otherwise
-        """
+    def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
         return db.query(User).filter(User.id == user_id).first()

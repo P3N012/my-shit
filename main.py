@@ -1,106 +1,110 @@
-"""
-FastAPI Application
+"""FastAPI application entry point."""
 
-Main application setup with:
-- CORS middleware
-- Route registration
-- Error handling
-- Startup/shutdown events
-"""
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+import logging
 from contextlib import asynccontextmanager
 
-from app.core.config import settings
-from app.core.database import init_db
+from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
-# Import routers
-from app.routes import auth, oauth, campaigns, dashboard
+from app.core.config import settings
+from app.core.database import get_db
+from app.core.limiter import limiter
+from app.core.logging import configure_logging
+from app.core.middleware import RequestContextMiddleware
+from app.routes import auth, organizations
+
+logger = logging.getLogger("api")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Application lifespan events.
-    
-    Runs on startup and shutdown.
-    """
-    # Startup
-    print(f"🚀 Starting {settings.PROJECT_NAME}...")
-    print(f"📊 Environment: {settings.ENVIRONMENT}")
-    print(f"🔗 Database: {settings.DATABASE_URL.split('@')[1] if '@' in settings.DATABASE_URL else 'configured'}")
-    
-    # Initialize database (create tables if they don't exist)
-    if settings.is_development:
-        print("🔨 Initializing database...")
-        init_db()
-    
+    configure_logging(level=settings.LOG_LEVEL, environment=settings.ENVIRONMENT)
+    logger.info(
+        f"Starting {settings.PROJECT_NAME} (env={settings.ENVIRONMENT}, "
+        f"rate_limit_enabled={settings.RATE_LIMIT_ENABLED})"
+    )
     yield
-    
-    # Shutdown
-    print(f"👋 Shutting down {settings.PROJECT_NAME}...")
+    logger.info(f"Shutting down {settings.PROJECT_NAME}")
 
 
-# Create FastAPI app
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version="1.0.0",
-    description="Marketing Analytics Platform API",
+    description="InsightPlus API",
     docs_url=f"{settings.API_V1_PREFIX}/docs",
     redoc_url=f"{settings.API_V1_PREFIX}/redoc",
     openapi_url=f"{settings.API_V1_PREFIX}/openapi.json",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
-# CORS Middleware
+# slowapi wiring
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def _rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content={"detail": f"Rate limit exceeded: {exc.detail}"},
+    )
+
+
+# Middleware order: outermost runs first. Add the request-context middleware
+# last so it wraps everything below it (CORS, exception handlers, routes).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # ONLY this - no list with other origins!
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RequestContextMiddleware)
 
-from fastapi.responses import JSONResponse
 
-@app.options("/{full_path:path}")
-async def options_handler(full_path: str):
-    """Handle all OPTIONS requests (CORS preflight)"""
-    return JSONResponse(
-        content={},
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*",
-            "Access-Control-Allow-Credentials": "true",
-        }
-    )
-
-# ============================================================================
-# Routes
-# ============================================================================
-
-@app.get("/")
+@app.get("/", tags=["meta"])
 async def root():
-    """Root endpoint - health check"""
     return {
         "message": f"Welcome to {settings.PROJECT_NAME} API",
         "version": "1.0.0",
         "status": "healthy",
-        "environment": settings.ENVIRONMENT
+        "environment": settings.ENVIRONMENT,
     }
 
 
-@app.get("/health")
+@app.get("/health", tags=["meta"])
 async def health_check():
-    """Health check endpoint"""
+    """Liveness: the process is up."""
     return {"status": "healthy"}
 
 
-# Register API routers
+@app.get("/ready", tags=["meta"])
+def readiness(db: Session = Depends(get_db)):
+    """Readiness: the process is up *and* the database is reachable."""
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception as exc:
+        logger.warning(f"readiness check failed: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="database unavailable",
+        )
+    return {"status": "ready"}
+
+
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
-app.include_router(oauth.router, prefix=settings.API_V1_PREFIX)
-app.include_router(oauth.connections_router, prefix=settings.API_V1_PREFIX)
-app.include_router(campaigns.router, prefix=settings.API_V1_PREFIX)
-app.include_router(dashboard.router, prefix=settings.API_V1_PREFIX)
+app.include_router(organizations.router, prefix=settings.API_V1_PREFIX)
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "main:app",
+        host=settings.HOST,
+        port=settings.PORT,
+        reload=settings.is_development,
+    )

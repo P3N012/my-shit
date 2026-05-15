@@ -10,20 +10,19 @@ alembic==1.14.0
 
 # Authentication & Security
 python-jose[cryptography]==3.3.0
+# passlib 1.7.4 reads bcrypt.__about__.__version__, which was removed in
+# bcrypt 4.x — pin to 3.x until passlib releases 1.8.
 passlib[bcrypt]==1.7.4
+bcrypt<4.0.0
 python-dotenv==1.0.1
 
-# Google Ads API
-google-ads==29.2.0
-google-auth-oauthlib==1.2.1
-google-auth==2.36.0
+# Rate limiting
+slowapi==0.1.9
 
-# HTTP client for Meta Ads
-requests==2.32.3
-
-# Pydantic (newer versions with pre-built wheels for Windows)
+# Pydantic + EmailStr validator
 pydantic==2.10.3
 pydantic-settings==2.6.1
+email-validator==2.2.0
 
 # Utilities
 python-dateutil==2.9.0
