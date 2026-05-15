@@ -35,6 +35,9 @@ and will be added in dedicated modules as they're built.
 │   ├── core/
 │   │   ├── config.py             # Settings (env-driven)
 │   │   ├── database.py           # Engine, session, Base
+│   │   ├── limiter.py            # Shared slowapi limiter
+│   │   ├── logging.py            # JSON / human formatters + request_id contextvar
+│   │   ├── middleware.py         # RequestContextMiddleware
 │   │   └── security.py           # Password hashing, JWT, token hashing
 │   ├── models/
 │   │   ├── user.py               # User, RefreshToken
@@ -56,8 +59,12 @@ and will be added in dedicated modules as they're built.
 │   ├── conftest.py               # Shared fixtures (per-test SQLite)
 │   ├── test_auth.py
 │   ├── test_cors.py
-│   ├── test_health.py
-│   └── test_organizations.py
+│   ├── test_meta.py
+│   ├── test_organizations.py
+│   └── test_rate_limit.py
+├── Dockerfile
+├── docker-compose.yml
+├── .env.example
 └── .github/workflows/ci.yml      # pytest + Alembic-against-Postgres
 ```
 
@@ -65,16 +72,26 @@ and will be added in dedicated modules as they're built.
 
 ## Quick start
 
+### Option A — Docker Compose (recommended)
+
+```bash
+cp .env.example .env                       # optional; compose has sensible defaults
+docker compose up --build
+```
+
+Brings up Postgres + the API, runs migrations, exposes the API on
+`http://localhost:8000`. Swagger UI at `/api/v1/docs`.
+
+### Option B — Local Python
+
 ```bash
 python -m venv venv && source venv/bin/activate     # (Windows: venv\Scripts\activate)
 pip install -r requirements.txt
-cp .env.example .env                                # then edit (see below)
+cp .env.example .env                                # then edit (see Configuration)
 alembic upgrade head                                # apply migrations
 python scripts/seed_db.py                           # optional: test users
 python main.py                                      # http://localhost:8000
 ```
-
-Swagger UI: `http://localhost:8000/api/v1/docs`
 
 ---
 
@@ -97,6 +114,11 @@ All config is loaded from environment variables (or `.env`) via
 | `CORS_ORIGINS`                 | no       | `http://localhost:3000`  | Comma-separated. **Never `*` with cookies.**   |
 | `HOST`                         | no       | `0.0.0.0`                |                                                |
 | `PORT`                         | no       | `8000`                   |                                                |
+| `LOG_LEVEL`                    | no       | `INFO`                   |                                                |
+| `RATE_LIMIT_ENABLED`           | no       | `true`                   | Set `false` in test environments               |
+| `RATE_LIMIT_LOGIN`             | no       | `5/minute`               | Per-IP                                         |
+| `RATE_LIMIT_REGISTER`          | no       | `5/minute`               | Per-IP                                         |
+| `RATE_LIMIT_REFRESH`           | no       | `20/minute`              | Per-IP                                         |
 
 Generate strong secrets:
 
@@ -128,12 +150,17 @@ Base path: `/api/v1`
 | POST   | `/orgs`        | Create a new org (caller becomes `owner`)                         |
 | GET    | `/orgs/{id}`   | Get a specific org (403 if the user has no membership)            |
 
-### Health
+### Meta
 
-| Method | Path      | Description     |
-| ------ | --------- | --------------- |
-| GET    | `/`       | Welcome payload |
-| GET    | `/health` | Liveness check  |
+| Method | Path      | Description                                                              |
+| ------ | --------- | ------------------------------------------------------------------------ |
+| GET    | `/`       | Welcome payload                                                          |
+| GET    | `/health` | **Liveness** — the process is up                                         |
+| GET    | `/ready`  | **Readiness** — process is up *and* `SELECT 1` against the DB succeeded  |
+
+Every response carries an `X-Request-Id` header (echoing the client's if
+provided, otherwise a fresh UUID4) and every log line for that request
+includes it.
 
 ---
 
@@ -241,6 +268,28 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) on every PR:
 | `database "insightplus_dev" does not exist` | `createdb insightplus_dev`                            |
 | `password authentication failed` | Check `DATABASE_URL` in `.env`                                   |
 | `connection refused`             | Postgres not running (`pg_isready`)                              |
+
+---
+
+## Operations
+
+- **Logging.** Single root logger configured at startup. JSON output
+  (one object per line) in non-development environments, compact
+  human-readable output in `development`. Every record emitted while
+  handling a request carries the request's `request_id`.
+- **Request IDs.** `RequestContextMiddleware` assigns each request a
+  UUID4 (or honours an upstream `X-Request-Id`), stashes it in a
+  `ContextVar` for downstream logs, echoes it back on the response, and
+  emits one access log per request.
+- **Rate limiting.** `slowapi`, keyed by remote address. Defaults are
+  `5/min` for register and login, `20/min` for refresh. Tune via env
+  vars. Behind a reverse proxy, ensure the proxy sets the real client
+  IP upstream (e.g. nginx `proxy_set_header X-Real-IP`).
+- **Health probes.** `/health` for kubelet/load-balancer liveness;
+  `/ready` for readiness (returns 503 when the database is unreachable).
+- **Docker.** Multi-stage `Dockerfile` (builder installs deps system-wide
+  with `--prefix=/install`, runtime image runs as a non-root user). The
+  default `CMD` runs `alembic upgrade head` before launching uvicorn.
 
 ---
 

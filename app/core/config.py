@@ -30,10 +30,17 @@ class Settings(BaseSettings):
     
     # CORS
     CORS_ORIGINS: str = Field(default="http://localhost:3000", description="Allowed CORS origins (comma-separated)")
-    
+
     # Server
     HOST: str = Field(default="0.0.0.0", description="Server host")
     PORT: int = Field(default=8000, description="Server port")
+
+    # Observability + rate limiting
+    LOG_LEVEL: str = Field(default="INFO", description="Root log level")
+    RATE_LIMIT_ENABLED: bool = Field(default=True, description="Toggle slowapi rate limits globally")
+    RATE_LIMIT_LOGIN: str = Field(default="5/minute", description="Per-IP login rate limit")
+    RATE_LIMIT_REGISTER: str = Field(default="5/minute", description="Per-IP register rate limit")
+    RATE_LIMIT_REFRESH: str = Field(default="20/minute", description="Per-IP refresh rate limit")
     
     class Config:
         env_file = ".env"

@@ -16,6 +16,9 @@ os.environ.setdefault("ENVIRONMENT", "test")
 os.environ.setdefault(
     "CORS_ORIGINS", "http://localhost:3000,http://localhost:5173"
 )
+# Rate limits stay on by default in production; disable globally for tests
+# unless a specific test re-enables them.
+os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 
 import pytest
 from fastapi.testclient import TestClient

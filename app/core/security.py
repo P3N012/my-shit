@@ -7,6 +7,7 @@ Security utilities
 """
 
 import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 
@@ -40,8 +41,13 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 # ---------------------------------------------------------------------------
 
 def _encode(data: Dict[str, Any], secret: str, expires: timedelta) -> str:
+    now = _utcnow()
     to_encode = data.copy()
-    to_encode["exp"] = _utcnow() + expires
+    to_encode["iat"] = now
+    to_encode["exp"] = now + expires
+    # jti makes two tokens issued in the same second distinct (otherwise
+    # back-to-back logins produce identical refresh JWTs).
+    to_encode["jti"] = secrets.token_urlsafe(16)
     return jwt.encode(to_encode, secret, algorithm=settings.ALGORITHM)
 
 

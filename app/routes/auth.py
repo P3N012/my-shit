@@ -8,11 +8,12 @@ Authentication routes.
   GET  /auth/me         Current user
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.limiter import limiter
 from app.models.user import User
 from app.schemas.auth import (
     ErrorResponse,
@@ -43,15 +44,20 @@ def _token_response(access_token: str, refresh_token: str) -> TokenResponse:
     "/register",
     response_model=UserRegisterResponse,
     status_code=status.HTTP_201_CREATED,
-    responses={400: {"model": ErrorResponse}},
+    responses={400: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
 )
-def register(request: UserRegisterRequest, db: Session = Depends(get_db)):
+@limiter.limit(settings.RATE_LIMIT_REGISTER)
+def register(
+    request: Request,
+    payload: UserRegisterRequest,
+    db: Session = Depends(get_db),
+):
     try:
         user = AuthService.register_user(
             db=db,
-            email=request.email,
-            username=request.username,
-            password=request.password,
+            email=payload.email,
+            username=payload.username,
+            password=payload.password,
         )
     except ValueError as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -68,11 +74,16 @@ def register(request: UserRegisterRequest, db: Session = Depends(get_db)):
 @router.post(
     "/login",
     response_model=TokenResponse,
-    responses={401: {"model": ErrorResponse}},
+    responses={401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
 )
-def login(request: UserLoginRequest, db: Session = Depends(get_db)):
+@limiter.limit(settings.RATE_LIMIT_LOGIN)
+def login(
+    request: Request,
+    payload: UserLoginRequest,
+    db: Session = Depends(get_db),
+):
     user = AuthService.authenticate_user(
-        db=db, email=request.email, password=request.password
+        db=db, email=payload.email, password=payload.password
     )
     if not user:
         raise HTTPException(
@@ -86,16 +97,21 @@ def login(request: UserLoginRequest, db: Session = Depends(get_db)):
 @router.post(
     "/refresh",
     response_model=TokenResponse,
-    responses={401: {"model": ErrorResponse}},
+    responses={401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
 )
-def refresh_token(request: TokenRefreshRequest, db: Session = Depends(get_db)):
+@limiter.limit(settings.RATE_LIMIT_REFRESH)
+def refresh_token(
+    request: Request,
+    payload: TokenRefreshRequest,
+    db: Session = Depends(get_db),
+):
     """
     Rotate the refresh token.
 
     The presented refresh token is revoked and a brand-new access/refresh
     pair is returned. Clients must replace both tokens on every refresh.
     """
-    pair = AuthService.rotate_refresh_token(db, request.refresh_token)
+    pair = AuthService.rotate_refresh_token(db, payload.refresh_token)
     if not pair:
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token"
@@ -110,8 +126,8 @@ def refresh_token(request: TokenRefreshRequest, db: Session = Depends(get_db)):
     status_code=status.HTTP_204_NO_CONTENT,
     responses={401: {"model": ErrorResponse}},
 )
-def logout(request: TokenRefreshRequest, db: Session = Depends(get_db)):
-    if not AuthService.revoke_refresh_token(db, request.refresh_token):
+def logout(payload: TokenRefreshRequest, db: Session = Depends(get_db)):
+    if not AuthService.revoke_refresh_token(db, payload.refresh_token):
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
         )
