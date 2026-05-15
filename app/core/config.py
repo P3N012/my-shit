@@ -41,6 +41,16 @@ class Settings(BaseSettings):
     RATE_LIMIT_LOGIN: str = Field(default="5/minute", description="Per-IP login rate limit")
     RATE_LIMIT_REGISTER: str = Field(default="5/minute", description="Per-IP register rate limit")
     RATE_LIMIT_REFRESH: str = Field(default="20/minute", description="Per-IP refresh rate limit")
+    RATE_LIMIT_AI: str = Field(default="30/minute", description="Per-IP rate limit on AI endpoints")
+
+    # AI
+    ANTHROPIC_API_KEY: str = Field(default="", description="Anthropic API key. Required for AI features.")
+    ANTHROPIC_MODEL: str = Field(default="claude-opus-4-7", description="Default Claude model")
+    ANTHROPIC_MAX_TOKENS: int = Field(default=4096, description="Default max output tokens")
+    AI_ENABLED: bool = Field(default=True, description="Toggle AI endpoints globally")
+
+    # Background jobs
+    REDIS_URL: str = Field(default="redis://localhost:6379/0", description="Redis URL for arq job queue")
     
     class Config:
         env_file = ".env"

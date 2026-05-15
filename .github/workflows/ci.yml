@@ -32,6 +32,11 @@ jobs:
       REFRESH_TOKEN_SECRET: ci-refresh-secret
       ENVIRONMENT: test
       CORS_ORIGINS: http://localhost:3000,http://localhost:5173
+      RATE_LIMIT_ENABLED: "false"
+      # AI tests mock the Anthropic SDK — no real key needed.
+      ANTHROPIC_API_KEY: ""
+      AI_ENABLED: "true"
+      REDIS_URL: redis://localhost:6379/0
 
     steps:
       - uses: actions/checkout@v4

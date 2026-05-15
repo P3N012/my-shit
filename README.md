@@ -38,19 +38,26 @@ and will be added in dedicated modules as they're built.
 │   │   ├── limiter.py            # Shared slowapi limiter
 │   │   ├── logging.py            # JSON / human formatters + request_id contextvar
 │   │   ├── middleware.py         # RequestContextMiddleware
+│   │   ├── anthropic_client.py   # Anthropic SDK wrapper + cost estimator
 │   │   └── security.py           # Password hashing, JWT, token hashing
 │   ├── models/
 │   │   ├── user.py               # User, RefreshToken
-│   │   └── organization.py       # Organization, Membership
+│   │   ├── organization.py       # Organization, Membership
+│   │   ├── ai_job.py             # AIJob
+│   │   └── ai_usage.py           # AIUsage
 │   ├── schemas/
 │   │   ├── auth.py
-│   │   └── organization.py
+│   │   ├── organization.py
+│   │   └── ai.py
 │   ├── routes/
 │   │   ├── auth.py               # /api/v1/auth/*
-│   │   └── organizations.py      # /api/v1/orgs/*
+│   │   ├── organizations.py      # /api/v1/orgs/*
+│   │   └── ai.py                 # /api/v1/ai/*
 │   ├── services/
 │   │   ├── auth_service.py
-│   │   └── organization_service.py
+│   │   ├── organization_service.py
+│   │   ├── ai_service.py
+│   │   └── jobs_service.py
 │   └── utils/
 │       └── dependencies.py       # get_current_user, get_current_membership, require_role
 ├── scripts/
@@ -61,7 +68,9 @@ and will be added in dedicated modules as they're built.
 │   ├── test_cors.py
 │   ├── test_meta.py
 │   ├── test_organizations.py
-│   └── test_rate_limit.py
+│   ├── test_rate_limit.py
+│   └── test_ai.py                # Anthropic SDK is mocked
+├── worker.py                     # arq worker entry point
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .env.example
@@ -119,6 +128,12 @@ All config is loaded from environment variables (or `.env`) via
 | `RATE_LIMIT_LOGIN`             | no       | `5/minute`               | Per-IP                                         |
 | `RATE_LIMIT_REGISTER`          | no       | `5/minute`               | Per-IP                                         |
 | `RATE_LIMIT_REFRESH`           | no       | `20/minute`              | Per-IP                                         |
+| `RATE_LIMIT_AI`                | no       | `30/minute`              | Per-IP, applied to `/ai/messages` and `/ai/jobs` |
+| `ANTHROPIC_API_KEY`            | for AI   | —                        | Required to make real AI calls. Tests mock the SDK so this can be empty. |
+| `ANTHROPIC_MODEL`              | no       | `claude-opus-4-7`        | Default model. Overridable per-call.           |
+| `ANTHROPIC_MAX_TOKENS`         | no       | `4096`                   | Default `max_tokens` for completions.          |
+| `AI_ENABLED`                   | no       | `true`                   | Master toggle for `/ai/*`.                     |
+| `REDIS_URL`                    | for jobs | `redis://localhost:6379/0` | arq queue backend for async `/ai/jobs`.       |
 
 Generate strong secrets:
 
@@ -149,6 +164,15 @@ Base path: `/api/v1`
 | GET    | `/orgs`        | List orgs the current user belongs to                             |
 | POST   | `/orgs`        | Create a new org (caller becomes `owner`)                         |
 | GET    | `/orgs/{id}`   | Get a specific org (403 if the user has no membership)            |
+
+### AI (`/ai`) — org-scoped, requires `X-Organization-Id` header
+
+| Method | Path             | Description                                                                       |
+| ------ | ---------------- | --------------------------------------------------------------------------------- |
+| POST   | `/ai/messages`   | Synchronous Anthropic completion. Records one `ai_usage` row.                     |
+| POST   | `/ai/jobs`       | Enqueue an async completion via arq + Redis. Returns a `job_id`.                  |
+| GET    | `/ai/jobs/{id}`  | Job status (`queued`/`running`/`succeeded`/`failed`) and result if terminal.      |
+| GET    | `/ai/usage`      | Cumulative token + cost totals for the active org.                                |
 
 ### Meta
 
@@ -217,12 +241,14 @@ PR.
 
 ### Models
 
-| Model          | Purpose                                                       |
-| -------------- | ------------------------------------------------------------- |
-| `User`         | Account, password hash, status, subscription metadata         |
-| `RefreshToken` | Hash + expiry of an issued refresh JWT, scoped to a `User`    |
-| `Organization` | Tenant; everything user-data lives under an org               |
-| `Membership`   | `(user_id, organization_id, role)` — `owner` / `admin` / `member` |
+| Model          | Purpose                                                              |
+| -------------- | -------------------------------------------------------------------- |
+| `User`         | Account, password hash, status, subscription metadata                |
+| `RefreshToken` | Hash + expiry of an issued refresh JWT, scoped to a `User`           |
+| `Organization` | Tenant; everything user-data lives under an org                      |
+| `Membership`   | `(user_id, organization_id, role)` — `owner` / `admin` / `member`    |
+| `AIJob`        | Lifecycle for an enqueued AI call: `queued`/`running`/`succeeded`/`failed` |
+| `AIUsage`      | One row per Anthropic call — token counts (incl. cache hits) + USD cost |
 
 ---
 
@@ -268,6 +294,31 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) on every PR:
 | `database "insightplus_dev" does not exist` | `createdb insightplus_dev`                            |
 | `password authentication failed` | Check `DATABASE_URL` in `.env`                                   |
 | `connection refused`             | Postgres not running (`pg_isready`)                              |
+
+---
+
+## AI integration
+
+- **SDK.** Single wrapper at `app/core/anthropic_client.py`. Routes and
+  the worker never import `anthropic` directly. Defaults applied here:
+  model `claude-opus-4-7`, adaptive thinking enabled, top-level
+  `cache_control: {"type": "ephemeral"}` on every request so the last
+  cacheable block (usually the system prompt) is auto-cached.
+- **Sync calls.** `POST /ai/messages` runs in the request thread and
+  returns the completion. Records an `ai_usage` row with input/output
+  tokens, cache_creation/cache_read tokens, and a USD cost derived
+  from `MODEL_PRICING`. On upstream failure, still writes a usage row
+  with the error message — the audit trail covers attempted spend.
+- **Async calls.** `POST /ai/jobs` creates an `ai_jobs` row, enqueues
+  the work onto Redis via arq, and returns the job id. The worker
+  (`worker.py`) picks it up, runs `AIService.complete` with the same
+  usage-recording contract, and writes the result back. Poll
+  `GET /ai/jobs/{id}` for status.
+- **Per-org accounting.** Every AI row is scoped to the active org
+  (`X-Organization-Id`). `GET /ai/usage` aggregates calls/tokens/cost.
+- **Run the worker locally:** `arq worker.WorkerSettings`. Compose
+  brings up an `api` and a `worker` container that share the same
+  image and env.
 
 ---
 
