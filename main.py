@@ -6,15 +6,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.core.database import init_db
 from app.routes import auth
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print(f"Starting {settings.PROJECT_NAME} ({settings.ENVIRONMENT})")
-    if settings.is_development:
-        init_db()
     yield
     print(f"Shutting down {settings.PROJECT_NAME}")
 

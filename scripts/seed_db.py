@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.core.database import SessionLocal, init_db
+from app.core.database import SessionLocal
 from app.core.security import hash_password
 from app.models import User
 
@@ -56,10 +56,7 @@ def main():
     print("\n" + "=" * 50)
     print("SEEDING DATABASE WITH TEST DATA")
     print("=" * 50 + "\n")
-
-    print("Initializing database...")
-    init_db()
-    print()
+    print("Run `alembic upgrade head` first if you haven't.\n")
 
     db = SessionLocal()
 

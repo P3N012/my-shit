@@ -27,10 +27,14 @@ and will be added in dedicated modules as they're built.
 .
 ├── main.py                       # FastAPI app + entry point
 ├── requirements.txt
+├── alembic.ini
+├── alembic/                      # Migrations
+│   ├── env.py
+│   └── versions/
 ├── app/
 │   ├── core/
 │   │   ├── config.py             # Settings (env-driven)
-│   │   ├── database.py           # Engine, session, Base, init_db()
+│   │   ├── database.py           # Engine, session, Base
 │   │   └── security.py           # Password hashing, JWT, token hashing
 │   ├── models/
 │   │   └── user.py               # User, RefreshToken
@@ -43,9 +47,13 @@ and will be added in dedicated modules as they're built.
 │   └── utils/
 │       └── dependencies.py       # FastAPI deps (get_current_user, …)
 ├── scripts/
-│   ├── init_db.py                # Create tables
 │   └── seed_db.py                # Seed test users
-└── tests/
+├── tests/
+│   ├── conftest.py               # Shared fixtures (per-test SQLite)
+│   ├── test_auth.py
+│   ├── test_cors.py
+│   └── test_health.py
+└── .github/workflows/ci.yml      # pytest + Alembic-against-Postgres
 ```
 
 ---
@@ -56,7 +64,7 @@ and will be added in dedicated modules as they're built.
 python -m venv venv && source venv/bin/activate     # (Windows: venv\Scripts\activate)
 pip install -r requirements.txt
 cp .env.example .env                                # then edit (see below)
-python scripts/init_db.py                           # create tables
+alembic upgrade head                                # apply migrations
 python scripts/seed_db.py                           # optional: test users
 python main.py                                      # http://localhost:8000
 ```
@@ -132,10 +140,18 @@ Base path: `/api/v1`
 
 ## Database
 
-For local development, `init_db()` runs on app startup and creates tables
-via SQLAlchemy. There are no migrations checked in yet — schema changes
-require a manual reset until Alembic is introduced. Add Alembic before
-the schema stabilizes for production.
+Schema is managed by **Alembic**. Migrations live under `alembic/versions/`.
+
+```bash
+alembic upgrade head                        # apply all migrations
+alembic revision --autogenerate -m "..."    # generate a new migration
+alembic downgrade -1                        # roll back one
+alembic current                             # show current revision
+```
+
+The app does **not** create tables at startup; running migrations is
+explicit. CI verifies migrations apply cleanly against Postgres on every
+PR.
 
 ### Models
 
@@ -164,8 +180,14 @@ These are obviously not for production.
 ```bash
 python main.py                                # auto-reload in dev
 uvicorn main:app --reload                     # equivalent
-pytest                                        # (when tests are added)
+pytest                                        # run the test suite
+pytest -k auth                                # filter
 ```
+
+CI (GitHub Actions, `.github/workflows/ci.yml`) on every PR:
+
+- applies Alembic migrations against a real Postgres service
+- runs `pytest` (which uses SQLite per-test via `conftest.py`)
 
 ### Style
 
