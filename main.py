@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.routes import auth
+from app.routes import auth, organizations
 
 
 @asynccontextmanager
@@ -51,6 +51,7 @@ async def health_check():
 
 
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
+app.include_router(organizations.router, prefix=settings.API_V1_PREFIX)
 
 
 if __name__ == "__main__":

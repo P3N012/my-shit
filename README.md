@@ -37,22 +37,27 @@ and will be added in dedicated modules as they're built.
 │   │   ├── database.py           # Engine, session, Base
 │   │   └── security.py           # Password hashing, JWT, token hashing
 │   ├── models/
-│   │   └── user.py               # User, RefreshToken
+│   │   ├── user.py               # User, RefreshToken
+│   │   └── organization.py       # Organization, Membership
 │   ├── schemas/
-│   │   └── auth.py               # Pydantic request/response models
+│   │   ├── auth.py
+│   │   └── organization.py
 │   ├── routes/
-│   │   └── auth.py               # /api/v1/auth/*
+│   │   ├── auth.py               # /api/v1/auth/*
+│   │   └── organizations.py      # /api/v1/orgs/*
 │   ├── services/
-│   │   └── auth_service.py       # Auth business logic
+│   │   ├── auth_service.py
+│   │   └── organization_service.py
 │   └── utils/
-│       └── dependencies.py       # FastAPI deps (get_current_user, …)
+│       └── dependencies.py       # get_current_user, get_current_membership, require_role
 ├── scripts/
 │   └── seed_db.py                # Seed test users
 ├── tests/
 │   ├── conftest.py               # Shared fixtures (per-test SQLite)
 │   ├── test_auth.py
 │   ├── test_cors.py
-│   └── test_health.py
+│   ├── test_health.py
+│   └── test_organizations.py
 └── .github/workflows/ci.yml      # pytest + Alembic-against-Postgres
 ```
 
@@ -109,11 +114,19 @@ Base path: `/api/v1`
 
 | Method | Path             | Description                                                          |
 | ------ | ---------------- | -------------------------------------------------------------------- |
-| POST   | `/auth/register` | Create an account                                                    |
+| POST   | `/auth/register` | Create an account (auto-provisions a personal organization)          |
 | POST   | `/auth/login`    | Exchange credentials for an access + refresh token pair              |
 | POST   | `/auth/refresh`  | **Rotates** the refresh token; returns a new access + refresh pair   |
 | POST   | `/auth/logout`   | Revoke a refresh token                                               |
-| GET    | `/auth/me`       | Current user (requires `Authorization: Bearer <access_token>`)       |
+| GET    | `/auth/me`       | Current user + memberships (requires `Authorization: Bearer <token>`) |
+
+### Organizations (`/orgs`)
+
+| Method | Path           | Description                                                       |
+| ------ | -------------- | ----------------------------------------------------------------- |
+| GET    | `/orgs`        | List orgs the current user belongs to                             |
+| POST   | `/orgs`        | Create a new org (caller becomes `owner`)                         |
+| GET    | `/orgs/{id}`   | Get a specific org (403 if the user has no membership)            |
 
 ### Health
 
@@ -136,6 +149,28 @@ Base path: `/api/v1`
 - **Logout** — deletes the corresponding refresh-token row. Outstanding
   access tokens remain valid until their natural expiry.
 
+## Multi-tenancy
+
+Every authenticated request that touches tenant data must declare which
+organization it's acting against:
+
+```
+Authorization:       Bearer <access_token>
+X-Organization-Id:   42
+```
+
+Org-scoped endpoints take a `Membership` via the
+`get_current_membership` FastAPI dependency, which:
+
+1. Resolves the user from the JWT (`get_current_user`).
+2. Reads `X-Organization-Id` (400 if missing).
+3. Looks up the `(user_id, organization_id)` membership row (403 if absent).
+4. Returns the `Membership` — its `role` is then available for further
+   authorization via the `require_role("owner", "admin", …)` factory.
+
+Registering a user auto-creates a personal organization with that user
+as `owner`. There is always at least one org per user.
+
 ---
 
 ## Database
@@ -155,10 +190,12 @@ PR.
 
 ### Models
 
-| Model          | Purpose                                                     |
-| -------------- | ----------------------------------------------------------- |
-| `User`         | Account, password hash, status, subscription metadata       |
-| `RefreshToken` | Hash + expiry of an issued refresh JWT, scoped to a `User`  |
+| Model          | Purpose                                                       |
+| -------------- | ------------------------------------------------------------- |
+| `User`         | Account, password hash, status, subscription metadata         |
+| `RefreshToken` | Hash + expiry of an issued refresh JWT, scoped to a `User`    |
+| `Organization` | Tenant; everything user-data lives under an org               |
+| `Membership`   | `(user_id, organization_id, role)` — `owner` / `admin` / `member` |
 
 ---
 

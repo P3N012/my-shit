@@ -15,6 +15,7 @@ from app.core.security import (
     hash_token,
     verify_password,
 )
+from app.models.organization import ROLE_OWNER, Membership, Organization
 from app.models.user import RefreshToken, User
 
 
@@ -32,6 +33,12 @@ class AuthService:
         username: str,
         password: str,
     ) -> User:
+        """
+        Create a user and their personal organization in one transaction.
+
+        Every user is the owner of at least one org. Subsequent org-scoped
+        endpoints can rely on the existence of at least one membership.
+        """
         if db.query(User).filter(User.email == email).first():
             raise ValueError("Email already registered")
         if db.query(User).filter(User.username == username).first():
@@ -46,8 +53,20 @@ class AuthService:
             subscription_status="trial",
             trial_ends_at=_utcnow() + timedelta(days=14),
         )
-
         db.add(user)
+        db.flush()  # need user.id for the membership
+
+        org = Organization(name=f"{username}'s workspace")
+        db.add(org)
+        db.flush()
+
+        db.add(
+            Membership(
+                user_id=user.id,
+                organization_id=org.id,
+                role=ROLE_OWNER,
+            )
+        )
         db.commit()
         db.refresh(user)
         return user

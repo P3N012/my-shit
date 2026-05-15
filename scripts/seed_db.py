@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.core.database import SessionLocal
 from app.core.security import hash_password
-from app.models import User
+from app.models import ROLE_OWNER, Membership, Organization, User
 
 
 def create_test_users(db):
@@ -42,13 +42,24 @@ def create_test_users(db):
 
     for user in users:
         db.add(user)
+    db.flush()
+
+    for user in users:
+        org = Organization(name=f"{user.username}'s workspace")
+        db.add(org)
+        db.flush()
+        db.add(
+            Membership(
+                user_id=user.id, organization_id=org.id, role=ROLE_OWNER
+            )
+        )
 
     db.commit()
 
     for user in users:
         db.refresh(user)
 
-    print(f"Created {len(users)} test users")
+    print(f"Created {len(users)} test users (each with a personal org)")
     return users
 
 

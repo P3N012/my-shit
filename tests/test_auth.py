@@ -130,7 +130,14 @@ def test_me_returns_current_user(client, auth_tokens, registered_user):
         headers={"Authorization": f"Bearer {auth_tokens['access_token']}"},
     )
     assert r.status_code == 200
-    assert r.json()["email"] == registered_user["email"]
+    body = r.json()
+    assert body["email"] == registered_user["email"]
+    # Every newly registered user gets a personal org with owner role.
+    assert len(body["memberships"]) == 1
+    m = body["memberships"][0]
+    assert m["role"] == "owner"
+    assert registered_user["username"] in m["organization_name"]
+    assert isinstance(m["organization_id"], int)
 
 
 def test_me_requires_token(client):

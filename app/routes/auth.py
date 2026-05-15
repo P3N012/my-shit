@@ -23,6 +23,7 @@ from app.schemas.auth import (
     UserRegisterResponse,
     UserResponse,
 )
+from app.schemas.organization import MembershipResponse
 from app.services.auth_service import AuthService
 from app.utils.dependencies import get_current_user
 
@@ -123,6 +124,14 @@ def logout(request: TokenRefreshRequest, db: Session = Depends(get_db)):
     responses={401: {"model": ErrorResponse}},
 )
 def get_current_user_info(current_user: User = Depends(get_current_user)):
+    memberships = [
+        MembershipResponse(
+            organization_id=m.organization_id,
+            organization_name=m.organization.name,
+            role=m.role,
+        )
+        for m in current_user.memberships
+    ]
     return UserResponse(
         id=current_user.id,
         email=current_user.email,
@@ -132,4 +141,5 @@ def get_current_user_info(current_user: User = Depends(get_current_user)):
         subscription_tier=current_user.subscription_tier,
         subscription_status=current_user.subscription_status,
         created_at=current_user.created_at,
+        memberships=memberships,
     )
