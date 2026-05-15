@@ -23,20 +23,20 @@ def create_test_users(db):
         User(
             email="test@insightplus.com",
             username="testuser",
-            password=hash_password("password123"),
+            password_hash=hash_password("password123"),
             is_admin=False,
             is_client=True,
             status="active",
             subscription_tier="professional",
-            subscription_status="active"
+            subscription_status="active",
         ),
         User(
             email="admin@insightplus.com",
             username="admin",
-            password=hash_password("admin123"),
+            password_hash=hash_password("admin123"),
             is_admin=True,
             is_client=False,
-            status="active"
+            status="active",
         ),
     ]
 
