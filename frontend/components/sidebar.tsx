@@ -1,0 +1,131 @@
+"use client";
+
+import {
+  ArrowRightLeft,
+  BarChart3,
+  LayoutDashboard,
+  LogOut,
+  MessageSquare,
+  Settings,
+} from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useMemo, useState } from "react";
+
+import { useAuth } from "./auth-context";
+import { Button } from "./ui/button";
+import { cn } from "@/lib/utils";
+
+const NAV = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/connections", label: "Connections", icon: ArrowRightLeft },
+  { href: "/ai-assistant", label: "AI Assistant", icon: MessageSquare },
+  { href: "/usage", label: "Usage", icon: BarChart3 },
+  { href: "/settings", label: "Settings", icon: Settings },
+] as const;
+
+export function Sidebar() {
+  const pathname = usePathname();
+  const { user, activeOrg, setActiveOrgId, logout } = useAuth();
+  const [orgMenuOpen, setOrgMenuOpen] = useState(false);
+
+  const initials = useMemo(() => {
+    if (!user) return "";
+    const source = user.username || user.email;
+    return source.slice(0, 2).toUpperCase();
+  }, [user]);
+
+  return (
+    <aside className="fixed inset-y-0 left-0 z-30 flex w-60 flex-col border-r border-line bg-panel">
+      <div className="flex flex-col gap-1 px-5 pt-6 pb-4">
+        <span className="font-heading text-base font-semibold tracking-tight text-accent">
+          InsightPlus
+        </span>
+      </div>
+
+      {user && user.memberships.length > 0 && (
+        <div className="relative px-3 pb-3">
+          <button
+            type="button"
+            onClick={() => setOrgMenuOpen((v) => !v)}
+            className={cn(
+              "flex w-full items-center justify-between rounded-md border border-line px-3 py-2",
+              "text-left text-sm font-medium text-ink",
+              "hover:border-accent/40"
+            )}
+          >
+            <span className="truncate">
+              {activeOrg?.organization_name ?? "Choose workspace"}
+            </span>
+            <span className="font-heading text-[10px] uppercase text-mute">
+              {activeOrg?.role ?? "—"}
+            </span>
+          </button>
+          {orgMenuOpen && (
+            <div className="absolute left-3 right-3 top-full z-50 mt-1 overflow-hidden rounded-md border border-line bg-panel shadow-xl">
+              {user.memberships.map((m) => (
+                <button
+                  key={m.organization_id}
+                  type="button"
+                  onClick={() => {
+                    setActiveOrgId(m.organization_id);
+                    setOrgMenuOpen(false);
+                  }}
+                  className={cn(
+                    "flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-line",
+                    m.organization_id === activeOrg?.organization_id ? "text-ink" : "text-mute"
+                  )}
+                >
+                  <span className="truncate">{m.organization_name}</span>
+                  <span className="font-heading text-[10px] uppercase text-fade">
+                    {m.role}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <nav className="flex-1 px-3">
+        {NAV.map(({ href, label, icon: Icon }) => {
+          const active = pathname === href || pathname.startsWith(`${href}/`);
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                "mb-0.5 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                active ? "bg-line text-ink" : "text-mute hover:bg-line/60 hover:text-ink"
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              <span>{label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="border-t border-line px-3 py-3">
+        <div className="flex items-center gap-3 px-2 py-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-line font-heading text-xs font-semibold text-ink">
+            {initials}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-medium text-ink">{user?.username}</div>
+            <div className="truncate text-xs text-fade">{user?.email}</div>
+          </div>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-2 w-full justify-center"
+          onClick={() => void logout()}
+        >
+          <LogOut className="h-3.5 w-3.5" />
+          <span>Sign out</span>
+        </Button>
+      </div>
+    </aside>
+  );
+}

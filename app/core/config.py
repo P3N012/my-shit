@@ -60,11 +60,11 @@ class Settings(BaseSettings):
         description="Where Stripe redirects after the user authorizes. Must match a Redirect URI configured in your Stripe Connect settings.",
     )
     STRIPE_OAUTH_SUCCESS_URL: str = Field(
-        default="http://localhost:3000/connections?stripe=ok",
+        default="http://localhost:3000/oauth/stripe?stripe=ok",
         description="Frontend URL the callback redirects to after a successful connect.",
     )
     STRIPE_OAUTH_FAILURE_URL: str = Field(
-        default="http://localhost:3000/connections?stripe=error",
+        default="http://localhost:3000/oauth/stripe?stripe=error",
         description="Frontend URL the callback redirects to on failure.",
     )
     

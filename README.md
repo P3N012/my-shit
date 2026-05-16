@@ -1,10 +1,14 @@
-# InsightPlus Backend
+# InsightPlus
 
-FastAPI + PostgreSQL backend for the InsightPlus SaaS dashboard.
+AI-powered revenue and customer intelligence for businesses on Stripe.
+Two halves of one repo:
 
-Provides user accounts and JWT-based authentication. Product features
-(dashboard, analytics, integrations) are intentionally out of scope here
-and will be added in dedicated modules as they're built.
+- **Backend** (this directory) — FastAPI + Postgres + arq + Anthropic.
+  Auth, multi-tenancy, Stripe Connect, sync, AI calls + usage tracking.
+- **Frontend** (`frontend/`) — Next.js 14 + Tailwind, dark monochrome
+  design. Talks to the backend over `/api/v1/*`.
+
+See `frontend/README.md` for the frontend's own walkthrough.
 
 ---
 
