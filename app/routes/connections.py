@@ -14,7 +14,10 @@ state token it presents.
 """
 
 import logging
+from typing import List
 
+from arq import create_pool
+from arq.connections import RedisSettings
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -23,11 +26,23 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.organization import Membership
 from app.models.platform_connection import PlatformConnection
+from app.models.stripe_data import (
+    SYNC_RUNNING,
+    StripeCharge,
+    StripeCustomer,
+    StripeSubscription,
+    SyncLog,
+)
 from app.schemas.platform_connection import (
+    ChargeSummary,
     ConnectionListResponse,
     ConnectionResponse,
+    CustomerSummary,
     DisconnectResponse,
     StripeOAuthInitResponse,
+    SubscriptionSummary,
+    SyncLogResponse,
+    SyncTriggerResponse,
 )
 from app.services.stripe_oauth_service import StripeOAuthService
 from app.utils.dependencies import get_current_membership
@@ -165,3 +180,169 @@ def delete_connection(
     if not ok:
         raise HTTPException(status_code=404, detail="Connection not found")
     return DisconnectResponse(message="Disconnected.")
+
+
+def _require_connection(
+    db: Session, *, connection_id: int, organization_id: int
+) -> PlatformConnection:
+    """Helper: 404 if the connection is missing or in another org."""
+    row = (
+        db.query(PlatformConnection)
+        .filter(
+            PlatformConnection.id == connection_id,
+            PlatformConnection.organization_id == organization_id,
+        )
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    return row
+
+
+@router.post(
+    "/{connection_id}/sync",
+    response_model=SyncTriggerResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def trigger_sync(
+    connection_id: int,
+    membership: Membership = Depends(get_current_membership),
+    db: Session = Depends(get_db),
+):
+    """
+    Enqueue a fresh sync for this connection. Returns immediately with a
+    sync_log_id the client can poll via `GET /connections/{id}/sync-logs`.
+    """
+    connection = _require_connection(
+        db, connection_id=connection_id, organization_id=membership.organization_id
+    )
+
+    # Write a running SyncLog up front so the client gets a real ID and the
+    # row exists even if Redis is down (we'll mark it failed in that case).
+    log = SyncLog(connection_id=connection.id, status=SYNC_RUNNING)
+    db.add(log)
+    db.commit()
+    db.refresh(log)
+
+    try:
+        pool = await create_pool(RedisSettings.from_dsn(settings.REDIS_URL))
+        await pool.enqueue_job("run_stripe_sync_job", connection.id)
+        await pool.close()
+    except Exception as exc:
+        logger.exception("sync enqueue failed")
+        log.status = "failed"
+        log.error = f"failed to enqueue: {exc}"[:1000]
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Job queue unavailable.",
+        )
+
+    return SyncTriggerResponse(sync_log_id=log.id, status=log.status)
+
+
+@router.get(
+    "/{connection_id}/sync-logs",
+    response_model=List[SyncLogResponse],
+)
+def list_sync_logs(
+    connection_id: int,
+    limit: int = Query(default=20, ge=1, le=100),
+    membership: Membership = Depends(get_current_membership),
+    db: Session = Depends(get_db),
+):
+    _require_connection(
+        db, connection_id=connection_id, organization_id=membership.organization_id
+    )
+    rows = (
+        db.query(SyncLog)
+        .filter(SyncLog.connection_id == connection_id)
+        .order_by(SyncLog.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        SyncLogResponse(
+            id=r.id,
+            connection_id=r.connection_id,
+            status=r.status,
+            started_at=r.started_at,
+            finished_at=r.finished_at,
+            stats=r.stats_json,
+            error=r.error,
+        )
+        for r in rows
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Read endpoints over the synced Stripe data
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/{connection_id}/customers",
+    response_model=List[CustomerSummary],
+)
+def list_customers(
+    connection_id: int,
+    limit: int = Query(default=50, ge=1, le=500),
+    membership: Membership = Depends(get_current_membership),
+    db: Session = Depends(get_db),
+):
+    _require_connection(
+        db, connection_id=connection_id, organization_id=membership.organization_id
+    )
+    rows = (
+        db.query(StripeCustomer)
+        .filter(StripeCustomer.connection_id == connection_id)
+        .order_by(StripeCustomer.stripe_created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [CustomerSummary.model_validate(r) for r in rows]
+
+
+@router.get(
+    "/{connection_id}/subscriptions",
+    response_model=List[SubscriptionSummary],
+)
+def list_subscriptions(
+    connection_id: int,
+    status_filter: str = Query(default="", alias="status"),
+    limit: int = Query(default=50, ge=1, le=500),
+    membership: Membership = Depends(get_current_membership),
+    db: Session = Depends(get_db),
+):
+    _require_connection(
+        db, connection_id=connection_id, organization_id=membership.organization_id
+    )
+    q = db.query(StripeSubscription).filter(
+        StripeSubscription.connection_id == connection_id
+    )
+    if status_filter:
+        q = q.filter(StripeSubscription.status == status_filter)
+    rows = q.order_by(StripeSubscription.stripe_created_at.desc()).limit(limit).all()
+    return [SubscriptionSummary.model_validate(r) for r in rows]
+
+
+@router.get(
+    "/{connection_id}/charges",
+    response_model=List[ChargeSummary],
+)
+def list_charges(
+    connection_id: int,
+    limit: int = Query(default=50, ge=1, le=500),
+    membership: Membership = Depends(get_current_membership),
+    db: Session = Depends(get_db),
+):
+    _require_connection(
+        db, connection_id=connection_id, organization_id=membership.organization_id
+    )
+    rows = (
+        db.query(StripeCharge)
+        .filter(StripeCharge.connection_id == connection_id)
+        .order_by(StripeCharge.stripe_created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [ChargeSummary.model_validate(r) for r in rows]

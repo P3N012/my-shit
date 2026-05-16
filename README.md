@@ -45,7 +45,8 @@ and will be added in dedicated modules as they're built.
 │   │   ├── organization.py       # Organization, Membership
 │   │   ├── ai_job.py             # AIJob
 │   │   ├── ai_usage.py           # AIUsage
-│   │   └── platform_connection.py  # PlatformConnection, OAuthState
+│   │   ├── platform_connection.py  # PlatformConnection, OAuthState
+│   │   └── stripe_data.py        # StripeCustomer, StripeSubscription, StripeCharge, SyncLog
 │   ├── schemas/
 │   │   ├── auth.py
 │   │   ├── organization.py
@@ -61,7 +62,8 @@ and will be added in dedicated modules as they're built.
 │   │   ├── organization_service.py
 │   │   ├── ai_service.py
 │   │   ├── jobs_service.py
-│   │   └── stripe_oauth_service.py
+│   │   ├── stripe_oauth_service.py
+│   │   └── stripe_sync_service.py
 │   └── utils/
 │       └── dependencies.py       # get_current_user, get_current_membership, require_role
 ├── scripts/
@@ -74,7 +76,8 @@ and will be added in dedicated modules as they're built.
 │   ├── test_organizations.py
 │   ├── test_rate_limit.py
 │   ├── test_ai.py                # Anthropic SDK is mocked
-│   └── test_connections.py       # Stripe SDK is mocked
+│   ├── test_connections.py       # Stripe OAuth flow (SDK mocked)
+│   └── test_stripe_sync.py       # Stripe sync (SDK mocked)
 ├── worker.py                     # arq worker entry point
 ├── Dockerfile
 ├── docker-compose.yml
@@ -186,6 +189,11 @@ Stripe Connect OAuth and connected-data-source management.
 | GET    | `/connections`                    | List the org's connected accounts (tokens never returned).                 |
 | GET    | `/connections/{id}`               | Get one connection.                                                        |
 | DELETE | `/connections/{id}`               | Disconnect: revoke at Stripe (best-effort) and remove the row.             |
+| POST   | `/connections/{id}/sync`          | Enqueue a Stripe sync via arq. Returns `sync_log_id` immediately.          |
+| GET    | `/connections/{id}/sync-logs`     | History of sync runs (newest first), with stats and any error.             |
+| GET    | `/connections/{id}/customers`     | Synced customers for this connection.                                      |
+| GET    | `/connections/{id}/subscriptions` | Synced subscriptions (filterable by `status`).                             |
+| GET    | `/connections/{id}/charges`       | Synced charges (last 90 days by default — sync window).                    |
 
 ### AI (`/ai`) — org-scoped, requires `X-Organization-Id` header
 
@@ -273,6 +281,10 @@ PR.
 | `AIUsage`      | One row per Anthropic call — token counts (incl. cache hits) + USD cost |
 | `PlatformConnection` | A connected third-party account (Stripe today; Google Ads/GA4 later). Stores OAuth tokens scoped to one org. |
 | `OAuthState`   | Short-lived CSRF token for the OAuth redirect leg. One-time use, 10-minute TTL. |
+| `StripeCustomer` | Mirrored Stripe customer, scoped to a `PlatformConnection`.                  |
+| `StripeSubscription` | Mirrored Stripe subscription (status, amount per period, interval).      |
+| `StripeCharge` | Mirrored Stripe charge (last 90 days), in cents.                              |
+| `SyncLog`      | Audit trail for sync runs (`running` / `success` / `failed`) with per-resource counts. |
 
 ---
 

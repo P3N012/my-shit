@@ -36,3 +36,64 @@ class StripeOAuthInitResponse(BaseModel):
 
 class DisconnectResponse(BaseModel):
     message: str
+
+
+class SyncTriggerResponse(BaseModel):
+    """Returned by `POST /connections/{id}/sync` — work was enqueued."""
+    sync_log_id: int
+    status: str  # "running" at the moment of enqueue
+
+
+class SyncLogResponse(BaseModel):
+    id: int
+    connection_id: int
+    status: str
+    started_at: datetime
+    finished_at: Optional[datetime]
+    stats: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CustomerSummary(BaseModel):
+    id: int
+    stripe_customer_id: str
+    email: Optional[str]
+    name: Optional[str]
+    currency: Optional[str]
+    balance: int
+    delinquent: bool
+    stripe_created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SubscriptionSummary(BaseModel):
+    id: int
+    stripe_subscription_id: str
+    stripe_customer_id: str
+    status: str
+    currency: Optional[str]
+    amount_per_period: int  # cents
+    interval: Optional[str]
+    interval_count: int
+    current_period_end: Optional[datetime]
+    cancel_at_period_end: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ChargeSummary(BaseModel):
+    id: int
+    stripe_charge_id: str
+    stripe_customer_id: Optional[str]
+    amount: int  # cents
+    amount_refunded: int
+    currency: str
+    status: str
+    paid: bool
+    refunded: bool
+    stripe_created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
