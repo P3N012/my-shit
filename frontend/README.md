@@ -83,8 +83,8 @@ frontend/
 | Disconnect | `DELETE /connections/{id}` |
 | AI Assistant | `POST /ai/messages` (single-shot; SSE streaming TBD) |
 | Usage | `GET /ai/usage` |
-| **Dashboard KPIs + MRR chart + top customers** | **Placeholder data.** Wires when `/dashboard/*` aggregate endpoints land (deferred PR C). |
-| **AI weekly review card** | **Placeholder copy.** Wires when the AI-review endpoint lands (deferred PR D). |
+| Dashboard KPIs + MRR chart + top customers | `GET /dashboard/overview`, `/trends`, `/top-customers` — computed in Python from the mirrored Stripe tables. |
+| AI weekly review card | `GET /ai/reviews/latest` + `POST /ai/reviews/generate` — Claude reads the past 7 days of aggregates and writes a 3-paragraph commentary. |
 
 ## Auth model on the client
 

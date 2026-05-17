@@ -28,6 +28,8 @@ from app.schemas.ai import (
     TokenUsageSchema,
     UsageSummaryResponse,
 )
+from app.schemas.ai_review import AIReviewResponse
+from app.services.ai_review_service import AIReviewService
 from app.services.ai_service import AIService
 from app.services.jobs_service import JobsService
 from app.utils.dependencies import get_current_membership
@@ -169,3 +171,54 @@ def get_usage(
 ):
     totals = AIService.org_usage_totals(db, organization_id=membership.organization_id)
     return UsageSummaryResponse(**totals)
+
+
+# ---------------------------------------------------------------------------
+# Weekly review
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/reviews/latest",
+    response_model=Optional[AIReviewResponse],
+    responses={204: {"description": "No review yet"}},
+)
+def latest_review(
+    membership: Membership = Depends(get_current_membership),
+    db: Session = Depends(get_db),
+):
+    review = AIReviewService.latest(db, organization_id=membership.organization_id)
+    if review is None:
+        return None
+    return AIReviewResponse.model_validate(review)
+
+
+@router.post(
+    "/reviews/generate",
+    response_model=AIReviewResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={503: {"description": "AI disabled or not configured"}},
+)
+def generate_review(
+    membership: Membership = Depends(get_current_membership),
+    db: Session = Depends(get_db),
+):
+    _check_enabled()
+    try:
+        review = AIReviewService.generate(
+            db,
+            organization_id=membership.organization_id,
+            user_id=membership.user_id,
+        )
+    except RuntimeError as exc:
+        logger.warning(f"AI not configured: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI is not configured on this server.",
+        )
+    except Exception as exc:
+        logger.exception("AI review generation failed")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"AI review generation failed: {exc}",
+        )
+    return AIReviewResponse.model_validate(review)

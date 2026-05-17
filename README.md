@@ -71,7 +71,8 @@ See `frontend/README.md` for the frontend's own walkthrough.
 │   └── utils/
 │       └── dependencies.py       # get_current_user, get_current_membership, require_role
 ├── scripts/
-│   └── seed_db.py                # Seed test users
+│   ├── seed_db.py                # Seed test users
+│   └── seed_demo_data.py         # Generate ~150 synthetic Stripe customers per test user
 ├── tests/
 │   ├── conftest.py               # Shared fixtures (per-test SQLite)
 │   ├── test_auth.py
@@ -199,6 +200,14 @@ Stripe Connect OAuth and connected-data-source management.
 | GET    | `/connections/{id}/subscriptions` | Synced subscriptions (filterable by `status`).                             |
 | GET    | `/connections/{id}/charges`       | Synced charges (last 90 days by default — sync window).                    |
 
+### Dashboard (`/dashboard`) — org-scoped
+
+| Method | Path                          | Description                                                          |
+| ------ | ----------------------------- | -------------------------------------------------------------------- |
+| GET    | `/dashboard/overview`         | Current MRR, ARR, active customer count, churn rate (+ 30d deltas).   |
+| GET    | `/dashboard/trends`           | 12 end-of-month MRR samples for the chart.                            |
+| GET    | `/dashboard/top-customers`    | Top N customers by revenue over the last 90 days.                     |
+
 ### AI (`/ai`) — org-scoped, requires `X-Organization-Id` header
 
 | Method | Path             | Description                                                                       |
@@ -207,6 +216,8 @@ Stripe Connect OAuth and connected-data-source management.
 | POST   | `/ai/jobs`       | Enqueue an async completion via arq + Redis. Returns a `job_id`.                  |
 | GET    | `/ai/jobs/{id}`  | Job status (`queued`/`running`/`succeeded`/`failed`) and result if terminal.      |
 | GET    | `/ai/usage`      | Cumulative token + cost totals for the active org.                                |
+| GET    | `/ai/reviews/latest`   | Most recent weekly AI review for the org, or `null` if none exists.        |
+| POST   | `/ai/reviews/generate` | Generate a fresh review from the past 7 days of synced data. Records usage. |
 
 ### Meta
 
@@ -289,6 +300,7 @@ PR.
 | `StripeSubscription` | Mirrored Stripe subscription (status, amount per period, interval).      |
 | `StripeCharge` | Mirrored Stripe charge (last 90 days), in cents.                              |
 | `SyncLog`      | Audit trail for sync runs (`running` / `success` / `failed`) with per-resource counts. |
+| `AIReview`     | One row per generated weekly review. Stores the prompt's metric snapshot alongside the text so it can be re-audited later. |
 
 ---
 

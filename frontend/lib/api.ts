@@ -11,10 +11,14 @@
 import { orgStorage, tokenStorage } from "./auth-storage";
 import type {
   AIMessagesResponse,
+  AIReview,
   AIUsageSummary,
   ChargeSummary,
   Connection,
   ConnectionListResponse,
+  DashboardOverview,
+  DashboardTopCustomers,
+  DashboardTrends,
   Organization,
   OAuthInitResponse,
   StripeCustomerSummary,
@@ -225,4 +229,25 @@ export const api = {
     }),
 
   aiUsage: () => request<AIUsageSummary>("/ai/usage"),
+
+  // ---------------------------------------------------------------------------
+  // Dashboard
+  // ---------------------------------------------------------------------------
+
+  dashboardOverview: () => request<DashboardOverview>("/dashboard/overview"),
+
+  dashboardTrends: (months = 12) =>
+    request<DashboardTrends>(`/dashboard/trends?months=${months}`),
+
+  dashboardTopCustomers: (limit = 5) =>
+    request<DashboardTopCustomers>(`/dashboard/top-customers?limit=${limit}`),
+
+  // ---------------------------------------------------------------------------
+  // AI weekly review
+  // ---------------------------------------------------------------------------
+
+  aiReviewLatest: () => request<AIReview | null>("/ai/reviews/latest"),
+
+  aiReviewGenerate: () =>
+    request<AIReview>("/ai/reviews/generate", { method: "POST" }),
 };

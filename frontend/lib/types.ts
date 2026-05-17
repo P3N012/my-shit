@@ -136,3 +136,58 @@ export interface OAuthInitResponse {
   authorization_url: string;
   state: string;
 }
+
+// ---------------------------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------------------------
+
+export interface KpiDelta {
+  value_pct: number;
+  positive: boolean;
+}
+
+export interface DashboardOverview {
+  mrr_cents: number;
+  arr_cents: number;
+  active_customers: number;
+  churn_rate: number;
+  mrr_delta: KpiDelta | null;
+  arr_delta: KpiDelta | null;
+  customers_delta: KpiDelta | null;
+  churn_delta: KpiDelta | null;
+  period_days: number;
+}
+
+export interface DashboardTrendPoint {
+  date: string;
+  mrr_cents: number;
+}
+
+export interface DashboardTrends {
+  points: DashboardTrendPoint[];
+}
+
+export interface DashboardTopCustomer {
+  stripe_customer_id: string;
+  name: string | null;
+  email: string | null;
+  total_revenue_cents: number;
+}
+
+export interface DashboardTopCustomers {
+  customers: DashboardTopCustomer[];
+}
+
+// ---------------------------------------------------------------------------
+// AI review
+// ---------------------------------------------------------------------------
+
+export interface AIReview {
+  id: number;
+  period_start: string;
+  period_end: string;
+  model: string;
+  content: string;
+  metrics_snapshot: Record<string, unknown> | null;
+  created_at: string;
+}

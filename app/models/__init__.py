@@ -8,6 +8,7 @@ from app.models.ai_job import (
     JOB_TERMINAL,
     AIJob,
 )
+from app.models.ai_review import AIReview
 from app.models.ai_usage import AIUsage
 from app.models.platform_connection import (
     CONN_ACTIVE,
@@ -52,6 +53,7 @@ __all__ = [
     "JOB_FAILED",
     "JOB_TERMINAL",
     "AIUsage",
+    "AIReview",
     "PlatformConnection",
     "OAuthState",
     "PLATFORM_STRIPE",

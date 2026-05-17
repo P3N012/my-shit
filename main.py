@@ -15,7 +15,7 @@ from app.core.database import get_db
 from app.core.limiter import limiter
 from app.core.logging import configure_logging
 from app.core.middleware import RequestContextMiddleware
-from app.routes import ai, auth, connections, organizations
+from app.routes import ai, auth, connections, dashboard, organizations
 
 logger = logging.getLogger("api")
 
@@ -98,6 +98,7 @@ def readiness(db: Session = Depends(get_db)):
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(organizations.router, prefix=settings.API_V1_PREFIX)
 app.include_router(connections.router, prefix=settings.API_V1_PREFIX)
+app.include_router(dashboard.router, prefix=settings.API_V1_PREFIX)
 app.include_router(ai.router, prefix=settings.API_V1_PREFIX)
 
 
