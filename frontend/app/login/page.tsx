@@ -44,7 +44,7 @@ export default function LoginPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-base px-6">
-      <div className="absolute left-8 top-8 font-heading text-base font-semibold text-accent">
+      <div className="text-ember absolute left-8 top-8 font-heading text-xl font-bold tracking-tight">
         InsightPlus
       </div>
 

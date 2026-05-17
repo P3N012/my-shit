@@ -8,17 +8,17 @@ interface KpiCardProps {
 
 export function KpiCard({ label, value, delta }: KpiCardProps) {
   return (
-    <div className="rounded-lg border border-line bg-panel p-6">
-      <div className="font-heading text-xs font-medium uppercase tracking-wide text-fade">
+    <div className="stripe-ember relative overflow-hidden rounded-lg border border-line bg-panel p-7">
+      <div className="font-heading text-xs font-semibold uppercase tracking-wide text-mute">
         {label}
       </div>
-      <div className="mt-2 font-heading text-3xl font-semibold tracking-tight text-ink">
+      <div className="mt-3 font-heading text-3xl font-bold tracking-tight text-ink">
         {value}
       </div>
       {delta && (
         <div
           className={cn(
-            "mt-1 font-heading text-xs font-medium",
+            "mt-1.5 text-xs font-semibold",
             delta.positive ? "text-accent" : "text-mute"
           )}
         >

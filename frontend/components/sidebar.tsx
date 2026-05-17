@@ -36,33 +36,33 @@ export function Sidebar() {
   }, [user]);
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 flex w-60 flex-col border-r border-line bg-panel">
-      <div className="flex flex-col gap-1 px-5 pt-6 pb-4">
-        <span className="font-heading text-base font-semibold tracking-tight text-accent">
+    <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-line bg-panel">
+      <div className="flex flex-col gap-1 px-6 pt-7 pb-5">
+        <span className="text-ember font-heading text-xl font-bold tracking-tight">
           InsightPlus
         </span>
       </div>
 
       {user && user.memberships.length > 0 && (
-        <div className="relative px-3 pb-3">
+        <div className="relative px-4 pb-4">
           <button
             type="button"
             onClick={() => setOrgMenuOpen((v) => !v)}
             className={cn(
-              "flex w-full items-center justify-between rounded-md border border-line px-3 py-2",
-              "text-left text-sm font-medium text-ink",
-              "hover:border-accent/40"
+              "flex w-full items-center justify-between rounded-md border border-line px-3 py-2.5",
+              "text-left text-sm font-semibold text-ink",
+              "hover:border-accent/40 hover:bg-elev"
             )}
           >
             <span className="truncate">
               {activeOrg?.organization_name ?? "Choose workspace"}
             </span>
-            <span className="font-heading text-[10px] uppercase text-mute">
+            <span className="text-[10px] font-bold uppercase text-accent">
               {activeOrg?.role ?? "—"}
             </span>
           </button>
           {orgMenuOpen && (
-            <div className="absolute left-3 right-3 top-full z-50 mt-1 overflow-hidden rounded-md border border-line bg-panel shadow-xl">
+            <div className="absolute left-4 right-4 top-full z-50 mt-1 overflow-hidden rounded-md border border-line bg-panel shadow-2xl">
               {user.memberships.map((m) => (
                 <button
                   key={m.organization_id}
@@ -72,12 +72,14 @@ export function Sidebar() {
                     setOrgMenuOpen(false);
                   }}
                   className={cn(
-                    "flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-line",
-                    m.organization_id === activeOrg?.organization_id ? "text-ink" : "text-mute"
+                    "flex w-full items-center justify-between px-3 py-2.5 text-left text-sm hover:bg-elev",
+                    m.organization_id === activeOrg?.organization_id
+                      ? "text-ink"
+                      : "text-mute"
                   )}
                 >
                   <span className="truncate">{m.organization_name}</span>
-                  <span className="font-heading text-[10px] uppercase text-fade">
+                  <span className="text-[10px] font-bold uppercase text-fade">
                     {m.role}
                   </span>
                 </button>
@@ -95,8 +97,14 @@ export function Sidebar() {
               key={href}
               href={href}
               className={cn(
-                "mb-0.5 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                active ? "bg-line text-ink" : "text-mute hover:bg-line/60 hover:text-ink"
+                "mb-1 flex items-center gap-3 rounded-md py-2.5 pl-3 pr-3 text-sm font-semibold transition-colors",
+                // Active items get a 3px accent strip on the left and a
+                // soft 15% accent background — the Ember Glow "live
+                // indicator" pattern.
+                "border-l-[3px] border-transparent",
+                active
+                  ? "border-accent bg-accent/15 text-ink"
+                  : "text-mute hover:bg-elev/80 hover:text-ink"
               )}
             >
               <Icon className="h-4 w-4" />
@@ -108,11 +116,14 @@ export function Sidebar() {
 
       <div className="border-t border-line px-3 py-3">
         <div className="flex items-center gap-3 px-2 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-line font-heading text-xs font-semibold text-ink">
+          {/* Gradient avatar — orange to lighter orange, white initials. */}
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-muted text-xs font-bold text-white">
             {initials}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium text-ink">{user?.username}</div>
+            <div className="truncate text-sm font-semibold text-ink">
+              {user?.username}
+            </div>
             <div className="truncate text-xs text-fade">{user?.email}</div>
           </div>
         </div>

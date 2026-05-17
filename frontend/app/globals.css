@@ -24,7 +24,36 @@
 
 @layer utilities {
   .font-heading {
-    font-family: theme("fontFamily.mono");
-    letter-spacing: -0.01em;
+    font-family: theme("fontFamily.sans");
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  /* The gradient wordmark — orange to softer orange, webkit-clipped
+     to the text outline. Used for the InsightPlus logo. */
+  .text-ember {
+    background-image: linear-gradient(
+      135deg,
+      theme("colors.accent.DEFAULT") 0%,
+      theme("colors.accent.muted") 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  /* 3px accent stripe placed at the top of KPI cards. */
+  .stripe-ember::before {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 3px;
+    background-image: linear-gradient(
+      90deg,
+      theme("colors.accent.DEFAULT") 0%,
+      theme("colors.accent.muted") 100%
+    );
   }
 }

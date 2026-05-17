@@ -25,7 +25,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-base text-ink">
       <Sidebar />
-      <main className="ml-60">{children}</main>
+      <main className="ml-64">{children}</main>
     </div>
   );
 }

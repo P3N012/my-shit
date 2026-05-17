@@ -13,18 +13,19 @@ import {
 
 import type { DashboardTrendPoint } from "@/lib/types";
 
-const ACCENT = "oklch(0.7 0.19 40)";    // warm amber on near-black
-const GRID = "#1a1a1a";                 // hairline (D1 line)
-const AXIS = "#666";                    // D1 fade
+const ACCENT = "#ff6b35";
+const ACCENT_MUTED = "#ff8659";
+const GRID = "#2a2a2a";
+const AXIS = "#666";
 const TICK_FONT = {
-  fontFamily: "var(--font-mono)",
+  fontFamily: "var(--font-sans)",
   fontSize: 11,
 };
 
 interface RowData {
   label: string;
   fullDate: string;
-  mrr: number;     // dollars
+  mrr: number;
   isCurrent: boolean;
 }
 
@@ -52,9 +53,27 @@ export function MrrChart({ points }: { points: DashboardTrendPoint[] }) {
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={data}
-          margin={{ top: 10, right: 8, left: 0, bottom: 0 }}
-          barCategoryGap="20%"
+          margin={{ top: 16, right: 8, left: 0, bottom: 0 }}
+          barCategoryGap="22%"
         >
+          <defs>
+            {/* Vertical gradient inside each bar — accent at top, lighter
+                accent at the base. Mirrors the prototype's
+                linear-gradient(180deg, accent → muted). */}
+            <linearGradient id="ember-bar" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={ACCENT} />
+              <stop offset="100%" stopColor={ACCENT_MUTED} />
+            </linearGradient>
+            {/* Soft Gaussian-blur glow around each bar so they look like
+                they're emitting light — the "ember" part of the name. */}
+            <filter id="ember-glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="6" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
           <CartesianGrid stroke={GRID} strokeDasharray="0" vertical={false} />
           <XAxis
             dataKey="label"
@@ -71,11 +90,15 @@ export function MrrChart({ points }: { points: DashboardTrendPoint[] }) {
             width={56}
             tickFormatter={formatYTick}
           />
-          <Tooltip cursor={{ fill: "rgba(255,255,255,0.04)" }} content={<MrrTooltip />} />
+          <Tooltip
+            cursor={{ fill: "rgba(255,255,255,0.04)" }}
+            content={<MrrTooltip />}
+          />
           <Bar
             dataKey="mrr"
-            fill={ACCENT}
-            radius={[3, 3, 0, 0]}
+            fill="url(#ember-bar)"
+            filter="url(#ember-glow)"
+            radius={[6, 6, 0, 0]}
             isAnimationActive={false}
           />
         </BarChart>
@@ -96,14 +119,14 @@ function MrrTooltip(props: TooltipProps<number, string>) {
 
   return (
     <div className="rounded-md border border-line bg-panel px-3 py-2 shadow-xl">
-      <div className="font-heading text-xs uppercase tracking-wide text-fade">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-fade">
         {item.fullDate}
       </div>
-      <div className="mt-1 font-heading text-base font-semibold text-ink">
+      <div className="mt-1 font-heading text-base font-bold text-ink">
         ${item.mrr.toLocaleString("en-US", { maximumFractionDigits: 0 })}
       </div>
       {item.isCurrent && (
-        <div className="mt-0.5 font-heading text-[10px] uppercase tracking-wide text-accent">
+        <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
           current
         </div>
       )}

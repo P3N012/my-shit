@@ -4,17 +4,17 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded font-heading font-medium uppercase tracking-wide",
+  "inline-flex items-center rounded-full font-sans font-bold uppercase tracking-wide",
   {
     variants: {
       variant: {
-        active: "bg-line text-accent",
+        active: "bg-accent/15 text-accent",
         idle: "bg-line text-mute",
         error: "bg-line text-ink",
       },
       size: {
-        sm: "px-2 py-0.5 text-[10px]",
-        md: "px-2.5 py-1 text-xs",
+        sm: "px-2.5 py-1 text-[10px]",
+        md: "px-3 py-1.5 text-xs",
       },
     },
     defaultVariants: { variant: "idle", size: "md" },
