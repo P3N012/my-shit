@@ -197,12 +197,14 @@ def _seed_org(db, *, organization_id: int, user_id: int) -> None:
 
         sub_id = _stripe_id("sub")
         if i in churned_set:
-            # Canceled at some point between created_at and now.
-            canceled_at = created_at + timedelta(
-                seconds=random.randint(86400 * 30, int((now - created_at).total_seconds()))
-            )
-            if canceled_at >= now:
-                canceled_at = now - timedelta(days=random.randint(1, 30))
+            # Cancel somewhere between halfway through their tenure and
+            # a day before "now". The half-tenure floor makes sure even
+            # young customers (< 30 days old) can churn cleanly without
+            # the prior bug where the floor (30d) overshot the ceiling.
+            age_seconds = int((now - created_at).total_seconds())
+            half = max(1, age_seconds // 2)
+            canceled_seconds = random.randint(half, max(half, age_seconds - 86400))
+            canceled_at = created_at + timedelta(seconds=canceled_seconds)
             status = "canceled"
             ended_at = canceled_at
         elif i in past_due_set:
