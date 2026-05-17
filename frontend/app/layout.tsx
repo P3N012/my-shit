@@ -1,26 +1,21 @@
 import type { Metadata } from "next";
-import { Inter, Space_Grotesk } from "next/font/google";
+import { IBM_Plex_Sans, JetBrains_Mono } from "next/font/google";
 
 import { Providers } from "@/components/providers";
 
 import "./globals.css";
 
-// Direction 2 — Warm Industrial:
-//   Headings → Space Grotesk (geometric, slightly wide, friendly).
-//   Body → Inter (max legibility at small sizes for tables/labels).
-//
-// The CSS variable names stay `--font-mono` / `--font-sans` so Tailwind
-// config doesn't need to know which fonts are bound — swapping
-// directions is a one-file change here.
-
-const heading = Space_Grotesk({
+// Hybrid: Direction 1's fonts (JetBrains Mono headings + IBM Plex Sans
+// body) on Direction 1's dark surfaces, with the warm-amber accent
+// from Direction 2 wired in via tailwind.config.ts.
+const mono = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
-  variable: "--font-mono",  // historical name — heading slot
+  variable: "--font-mono",
   display: "swap",
 });
 
-const body = Inter({
+const sans = IBM_Plex_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-sans",
@@ -34,7 +29,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${heading.variable} ${body.variable}`}>
+    <html lang="en" className={`${mono.variable} ${sans.variable}`}>
       <body className="font-sans">
         <Providers>{children}</Providers>
       </body>
