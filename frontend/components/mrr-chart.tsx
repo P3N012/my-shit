@@ -64,10 +64,12 @@ export function MrrChart({ points }: { points: DashboardTrendPoint[] }) {
               <stop offset="0%" stopColor={ACCENT} />
               <stop offset="100%" stopColor={ACCENT_MUTED} />
             </linearGradient>
-            {/* Soft Gaussian-blur glow around each bar so they look like
-                they're emitting light — the "ember" part of the name. */}
-            <filter id="ember-glow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="6" result="blur" />
+            {/* Subtle Gaussian-blur glow — just enough to make the bars
+                look slightly emissive rather than flat. Was stdDeviation=6
+                (literal halo); 2 reads as warmth. Drop the filter entirely
+                if you want razor-sharp bars. */}
+            <filter id="ember-glow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="2" result="blur" />
               <feMerge>
                 <feMergeNode in="blur" />
                 <feMergeNode in="SourceGraphic" />
