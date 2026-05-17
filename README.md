@@ -72,7 +72,8 @@ See `frontend/README.md` for the frontend's own walkthrough.
 │       └── dependencies.py       # get_current_user, get_current_membership, require_role
 ├── scripts/
 │   ├── seed_db.py                # Seed test users
-│   └── seed_demo_data.py         # Generate ~150 synthetic Stripe customers per test user
+│   ├── seed_demo_data.py         # Generate ~150 synthetic Stripe customers per test user (no real Stripe needed)
+│   └── seed_stripe_test_data.py  # Push test customers/subs to a CONNECTED Stripe account via the Stripe API
 ├── tests/
 │   ├── conftest.py               # Shared fixtures (per-test SQLite)
 │   ├── test_auth.py
