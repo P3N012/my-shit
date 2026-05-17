@@ -13,6 +13,7 @@ on the user's behalf — and is bound to the initiating user by the
 state token it presents.
 """
 
+import asyncio
 import logging
 from typing import List
 
@@ -45,6 +46,7 @@ from app.schemas.platform_connection import (
     SyncTriggerResponse,
 )
 from app.services.stripe_oauth_service import StripeOAuthService
+from app.services.stripe_sync_service import StripeSyncService
 from app.utils.dependencies import get_current_membership
 
 logger = logging.getLogger("api.connections")
@@ -202,7 +204,6 @@ def _require_connection(
 @router.post(
     "/{connection_id}/sync",
     response_model=SyncTriggerResponse,
-    status_code=status.HTTP_202_ACCEPTED,
 )
 async def trigger_sync(
     connection_id: int,
@@ -210,34 +211,51 @@ async def trigger_sync(
     db: Session = Depends(get_db),
 ):
     """
-    Enqueue a fresh sync for this connection. Returns immediately with a
-    sync_log_id the client can poll via `GET /connections/{id}/sync-logs`.
+    Trigger a Stripe sync for this connection.
+
+    Tries to enqueue onto Redis (where a long-running `arq` worker would
+    pick it up). If Redis is not reachable — typical in a local dev
+    setup without the worker running — falls back to running the sync
+    **inline** in the request. That adds 5-30s of latency to the
+    response but means the dev flow works with zero extra processes.
+
+    Either way: the SyncLog row is the source of truth for what
+    happened; `GET /connections/{id}/sync-logs` shows the history.
     """
     connection = _require_connection(
         db, connection_id=connection_id, organization_id=membership.organization_id
     )
 
-    # Write a running SyncLog up front so the client gets a real ID and the
-    # row exists even if Redis is down (we'll mark it failed in that case).
+    # First: try the async path.
+    try:
+        pool = await create_pool(RedisSettings.from_dsn(settings.REDIS_URL))
+        try:
+            await pool.enqueue_job("run_stripe_sync_job", connection.id)
+        finally:
+            await pool.close()
+    except Exception as exc:
+        logger.info(
+            f"Redis enqueue unavailable ({exc}); falling back to inline sync"
+        )
+        # Inline fallback — StripeSyncService.sync creates and updates the
+        # SyncLog row itself, so we just call it and return what it produced.
+        try:
+            log = await asyncio.to_thread(StripeSyncService.sync, db, connection)
+        except Exception as sync_exc:
+            logger.exception("inline sync failed")
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Sync failed: {sync_exc}",
+            )
+        return SyncTriggerResponse(sync_log_id=log.id, status=log.status)
+
+    # Async path: write a pending SyncLog so the client has an ID and the
+    # /sync-logs endpoint shows something immediately. The worker will
+    # write its own completion row when it runs.
     log = SyncLog(connection_id=connection.id, status=SYNC_RUNNING)
     db.add(log)
     db.commit()
     db.refresh(log)
-
-    try:
-        pool = await create_pool(RedisSettings.from_dsn(settings.REDIS_URL))
-        await pool.enqueue_job("run_stripe_sync_job", connection.id)
-        await pool.close()
-    except Exception as exc:
-        logger.exception("sync enqueue failed")
-        log.status = "failed"
-        log.error = f"failed to enqueue: {exc}"[:1000]
-        db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Job queue unavailable.",
-        )
-
     return SyncTriggerResponse(sync_log_id=log.id, status=log.status)
 
 
