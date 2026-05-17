@@ -67,12 +67,10 @@ export default function DashboardPage() {
           <span className="font-heading text-xs text-fade">12 mo trailing</span>
         </CardHeader>
         <CardContent>
-          {trends.data && trends.data.points.length > 0 ? (
-            <MrrChart values={trends.data.points.map((p) => p.mrr_cents)} />
-          ) : trends.isLoading ? (
+          {trends.isLoading ? (
             <ChartPlaceholder text="Loading…" />
           ) : (
-            <ChartPlaceholder text="No data yet — connect Stripe or seed demo data." />
+            <MrrChart points={trends.data?.points ?? []} />
           )}
         </CardContent>
       </Card>
