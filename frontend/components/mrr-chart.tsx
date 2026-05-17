@@ -13,11 +13,11 @@ import {
 
 import type { DashboardTrendPoint } from "@/lib/types";
 
-const ACCENT = "oklch(0.65 0.24 142)";
-const GRID = "#1a1a1a";
-const AXIS = "#666";
+const ACCENT = "oklch(0.55 0.20 35)";   // Direction 2 burnt orange
+const GRID = "#e7e5e4";                 // hairline border
+const AXIS = "#78716c";                 // muted text
 const TICK_FONT = {
-  fontFamily: "var(--font-mono)",
+  fontFamily: "var(--font-sans)",
   fontSize: 11,
 };
 
@@ -71,7 +71,7 @@ export function MrrChart({ points }: { points: DashboardTrendPoint[] }) {
             width={56}
             tickFormatter={formatYTick}
           />
-          <Tooltip cursor={{ fill: "rgba(255,255,255,0.04)" }} content={<MrrTooltip />} />
+          <Tooltip cursor={{ fill: "rgba(0,0,0,0.04)" }} content={<MrrTooltip />} />
           <Bar
             dataKey="mrr"
             fill={ACCENT}

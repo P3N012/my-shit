@@ -1,6 +1,6 @@
 import type { Config } from "tailwindcss";
 
-// Direction 1 — Monochrome Authority
+// Direction 2 — Warm Industrial
 const config: Config = {
   darkMode: "class",
   content: [
@@ -11,33 +11,35 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // App surfaces — true blacks with a hint of warmth.
-        base: "#0a0a0a",
-        panel: "#000000",
-        line: "#1a1a1a",
-        elev: "#111111",
+        // App surfaces — warm stone palette.
+        base: "#fafaf9",       // warm stone white
+        panel: "#ffffff",      // pure white for cards
+        line: "#e7e5e4",       // hairline border
+        elev: "#f5f5f4",       // hover / subtle surface
 
         // Text scale.
-        ink: "#ffffff",
-        mute: "#888888",
-        fade: "#666666",
+        ink: "#1c1917",        // primary text (warm near-black)
+        mute: "#57534e",       // secondary
+        fade: "#78716c",       // tertiary, captions
 
-        // Accent — sharp cyan-green, the "trading terminal highlight."
+        // Accent — burnt orange / terracotta. Substantial, grounded.
         accent: {
-          DEFAULT: "oklch(0.65 0.24 142)",
-          fg: "#0a0a0a",
+          DEFAULT: "oklch(0.55 0.20 35)",
+          fg: "#ffffff",        // white text reads cleanly on the orange
         },
 
-        // Stripe brand purple, for the connection card logo.
+        // Stripe brand purple, unchanged across themes.
         stripe: "#635bff",
       },
       fontFamily: {
+        // Direction 2: Space Grotesk for headings (geometric but warm),
+        // Inter for body. Variable references are bound in app/layout.tsx.
         mono: ["var(--font-mono)", "ui-monospace", "monospace"],
         sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       borderRadius: {
-        DEFAULT: "6px",
-        lg: "8px",
+        DEFAULT: "8px",
+        lg: "12px",
       },
     },
   },
