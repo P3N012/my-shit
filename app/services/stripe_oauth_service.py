@@ -72,7 +72,13 @@ class StripeOAuthService:
         params = {
             "response_type": "code",
             "client_id": settings.STRIPE_CONNECT_CLIENT_ID,
-            "scope": "read_only",
+            # Stripe gates the `read_only` scope behind a support request
+            # for new Connect platforms — `read_write` is what's actually
+            # granted by default. We don't make any write calls anywhere
+            # in the codebase (StripeSyncService only reads), so this is
+            # purely a server-side policy concession, not a real
+            # privilege expansion on our side.
+            "scope": "read_write",
             "state": token,
             "redirect_uri": settings.STRIPE_OAUTH_REDIRECT_URI,
         }

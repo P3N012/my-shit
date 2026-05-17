@@ -63,7 +63,7 @@ def test_stripe_connect_returns_authorization_url(
     assert body["authorization_url"].startswith("https://connect.stripe.com/oauth/authorize")
     assert "client_id=ca_test_dummy" in body["authorization_url"]
     assert "state=" in body["authorization_url"]
-    assert "scope=read_only" in body["authorization_url"]
+    assert "scope=read_write" in body["authorization_url"]
     # State row got persisted
     states = db_session.query(OAuthState).all()
     assert len(states) == 1
