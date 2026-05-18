@@ -155,6 +155,8 @@ export interface DashboardOverview {
   arr_delta: KpiDelta | null;
   customers_delta: KpiDelta | null;
   churn_delta: KpiDelta | null;
+  failed_payments_count: number;
+  failed_payments_cents: number;
   period_days: number;
 }
 
@@ -167,6 +169,16 @@ export interface DashboardTrends {
   points: DashboardTrendPoint[];
 }
 
+export interface DashboardMovementPoint {
+  month_start: string;
+  new_mrr_cents: number;
+  churn_mrr_cents: number;
+}
+
+export interface DashboardMovements {
+  points: DashboardMovementPoint[];
+}
+
 export interface DashboardTopCustomer {
   stripe_customer_id: string;
   name: string | null;
@@ -176,6 +188,24 @@ export interface DashboardTopCustomer {
 
 export interface DashboardTopCustomers {
   customers: DashboardTopCustomer[];
+}
+
+export type ActivityEventKind =
+  | "subscription_started"
+  | "subscription_canceled"
+  | "charge_failed";
+
+export interface ActivityEvent {
+  kind: ActivityEventKind;
+  timestamp: string;
+  customer_name: string | null;
+  customer_email: string | null;
+  amount_cents: number;
+  description: string;
+}
+
+export interface DashboardActivity {
+  events: ActivityEvent[];
 }
 
 // ---------------------------------------------------------------------------

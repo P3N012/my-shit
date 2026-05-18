@@ -79,6 +79,8 @@ class Overview:
     mrr_cents_prev: int  # 30 days ago
     active_customers_prev: int
     churn_rate_prev: float
+    failed_payments_count: int
+    failed_payments_cents: int
     period_days: int
 
 
@@ -89,11 +91,35 @@ class TrendPoint:
 
 
 @dataclass
+class MovementPoint:
+    """Per-month MRR delta, decomposed into new vs. churned.
+
+    With our current schema we can't reliably attribute expansion or
+    contraction — that needs a subscription-changes history table. So
+    we limit movements to the two we *can* compute from snapshot data:
+    started-in-month and canceled-in-month.
+    """
+    month_start: datetime
+    new_mrr_cents: int
+    churn_mrr_cents: int   # positive number; the chart renders it as negative
+
+
+@dataclass
 class TopCustomer:
     stripe_customer_id: str
     name: Optional[str]
     email: Optional[str]
     total_revenue_cents: int
+
+
+@dataclass
+class ActivityEvent:
+    kind: str            # "subscription_started" | "subscription_canceled" | "charge_failed"
+    timestamp: datetime
+    customer_name: Optional[str]
+    customer_email: Optional[str]
+    amount_cents: int    # MRR for subs, charge amount for charges
+    description: str
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +184,7 @@ class DashboardService:
         arr_now = mrr_now * 12
 
         if not connection_ids:
-            return Overview(0, 0, 0, 0.0, 0, 0, 0.0, period_days)
+            return Overview(0, 0, 0, 0.0, 0, 0, 0.0, 0, 0, period_days)
 
         # Active customer counts at `now` and at `prev`.
         active_now = (
@@ -233,6 +259,25 @@ class DashboardService:
             else 0.0
         )
 
+        # Failed-payment summary for the same 30-day window. Cheap to
+        # compute alongside the rest so we don't have to fetch it as a
+        # separate call from the frontend.
+        failed_row = (
+            db.query(
+                func.count(StripeCharge.id),
+                func.coalesce(func.sum(StripeCharge.amount), 0),
+            )
+            .filter(
+                StripeCharge.connection_id.in_(connection_ids),
+                StripeCharge.status == "failed",
+                StripeCharge.stripe_created_at >= prev,
+                StripeCharge.stripe_created_at <= now,
+            )
+            .one()
+        )
+        failed_count = int(failed_row[0] or 0)
+        failed_amount_cents = int(failed_row[1] or 0)
+
         return Overview(
             mrr_cents=mrr_now,
             arr_cents=arr_now,
@@ -241,8 +286,188 @@ class DashboardService:
             mrr_cents_prev=mrr_prev,
             active_customers_prev=active_prev,
             churn_rate_prev=churn_prev,
+            failed_payments_count=failed_count,
+            failed_payments_cents=failed_amount_cents,
             period_days=period_days,
         )
+
+    @staticmethod
+    def mrr_movements(
+        db: Session, organization_id: int, months: int = 12
+    ) -> List[MovementPoint]:
+        """Per-month decomposition of MRR change into new vs. churn.
+
+        We can't compute expansion / contraction / reactivation from
+        snapshot data — those need a subscription-change history. New
+        and churn are derivable directly from
+        `stripe_created_at` / `canceled_at` on the subscription rows.
+        """
+        connection_ids = DashboardService._connection_ids(db, organization_id)
+        if not connection_ids:
+            return []
+
+        now = _utcnow()
+        current_month_start = now.replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+
+        points: List[MovementPoint] = []
+        for i in range(months - 1, -1, -1):
+            month_start = current_month_start - relativedelta(months=i)
+            month_end = month_start + relativedelta(months=1)
+
+            new_rows = (
+                db.query(
+                    StripeSubscription.amount_per_period,
+                    StripeSubscription.interval,
+                    StripeSubscription.interval_count,
+                )
+                .filter(
+                    StripeSubscription.connection_id.in_(connection_ids),
+                    StripeSubscription.stripe_created_at >= month_start,
+                    StripeSubscription.stripe_created_at < month_end,
+                )
+                .all()
+            )
+            new_mrr = sum(
+                normalize_to_monthly_cents(amt or 0, interval, count or 1)
+                for (amt, interval, count) in new_rows
+            )
+
+            churn_rows = (
+                db.query(
+                    StripeSubscription.amount_per_period,
+                    StripeSubscription.interval,
+                    StripeSubscription.interval_count,
+                )
+                .filter(
+                    StripeSubscription.connection_id.in_(connection_ids),
+                    StripeSubscription.canceled_at >= month_start,
+                    StripeSubscription.canceled_at < month_end,
+                )
+                .all()
+            )
+            churn_mrr = sum(
+                normalize_to_monthly_cents(amt or 0, interval, count or 1)
+                for (amt, interval, count) in churn_rows
+            )
+
+            points.append(
+                MovementPoint(
+                    month_start=month_start,
+                    new_mrr_cents=new_mrr,
+                    churn_mrr_cents=churn_mrr,
+                )
+            )
+        return points
+
+    @staticmethod
+    def activity_feed(
+        db: Session, organization_id: int, *, limit: int = 15, days: int = 30
+    ) -> List[ActivityEvent]:
+        """Recent customer events for the dashboard's activity card.
+
+        Pulls new subscriptions, cancellations, and failed charges in
+        the last `days`, joins customer name/email, sorts by timestamp
+        descending, returns the top `limit`.
+        """
+        connection_ids = DashboardService._connection_ids(db, organization_id)
+        if not connection_ids:
+            return []
+
+        since = _utcnow() - timedelta(days=days)
+
+        new_subs = (
+            db.query(StripeSubscription)
+            .filter(
+                StripeSubscription.connection_id.in_(connection_ids),
+                StripeSubscription.stripe_created_at >= since,
+            )
+            .all()
+        )
+        canceled_subs = (
+            db.query(StripeSubscription)
+            .filter(
+                StripeSubscription.connection_id.in_(connection_ids),
+                StripeSubscription.canceled_at >= since,
+            )
+            .all()
+        )
+        failed_charges = (
+            db.query(StripeCharge)
+            .filter(
+                StripeCharge.connection_id.in_(connection_ids),
+                StripeCharge.status == "failed",
+                StripeCharge.stripe_created_at >= since,
+            )
+            .all()
+        )
+
+        # One lookup, all customers referenced.
+        customer_ids = {s.stripe_customer_id for s in new_subs}
+        customer_ids |= {s.stripe_customer_id for s in canceled_subs}
+        customer_ids |= {
+            c.stripe_customer_id for c in failed_charges if c.stripe_customer_id
+        }
+        cmap = (
+            {
+                c.stripe_customer_id: c
+                for c in db.query(StripeCustomer)
+                .filter(
+                    StripeCustomer.connection_id.in_(connection_ids),
+                    StripeCustomer.stripe_customer_id.in_(customer_ids),
+                )
+                .all()
+            }
+            if customer_ids
+            else {}
+        )
+
+        events: List[ActivityEvent] = []
+        for s in new_subs:
+            c = cmap.get(s.stripe_customer_id)
+            plan = (s.stripe_metadata or {}).get("plan") if s.stripe_metadata else None
+            events.append(
+                ActivityEvent(
+                    kind="subscription_started",
+                    timestamp=s.stripe_created_at,
+                    customer_name=c.name if c else None,
+                    customer_email=c.email if c else None,
+                    amount_cents=normalize_to_monthly_cents(
+                        s.amount_per_period, s.interval, s.interval_count
+                    ),
+                    description=f"Subscribed to {plan}" if plan else "Started subscription",
+                )
+            )
+        for s in canceled_subs:
+            c = cmap.get(s.stripe_customer_id)
+            events.append(
+                ActivityEvent(
+                    kind="subscription_canceled",
+                    timestamp=s.canceled_at,
+                    customer_name=c.name if c else None,
+                    customer_email=c.email if c else None,
+                    amount_cents=normalize_to_monthly_cents(
+                        s.amount_per_period, s.interval, s.interval_count
+                    ),
+                    description="Canceled subscription",
+                )
+            )
+        for ch in failed_charges:
+            c = cmap.get(ch.stripe_customer_id) if ch.stripe_customer_id else None
+            events.append(
+                ActivityEvent(
+                    kind="charge_failed",
+                    timestamp=ch.stripe_created_at,
+                    customer_name=c.name if c else None,
+                    customer_email=c.email if c else None,
+                    amount_cents=int(ch.amount or 0),
+                    description=ch.failure_message or "Payment failed",
+                )
+            )
+
+        events.sort(key=lambda e: e.timestamp, reverse=True)
+        return events[:limit]
 
     @staticmethod
     def mrr_trend(db: Session, organization_id: int, months: int = 12) -> List[TrendPoint]:

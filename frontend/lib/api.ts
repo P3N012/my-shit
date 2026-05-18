@@ -16,6 +16,8 @@ import type {
   ChargeSummary,
   Connection,
   ConnectionListResponse,
+  DashboardActivity,
+  DashboardMovements,
   DashboardOverview,
   DashboardTopCustomers,
   DashboardTrends,
@@ -241,6 +243,12 @@ export const api = {
 
   dashboardTopCustomers: (limit = 5) =>
     request<DashboardTopCustomers>(`/dashboard/top-customers?limit=${limit}`),
+
+  dashboardMovements: (months = 12) =>
+    request<DashboardMovements>(`/dashboard/movements?months=${months}`),
+
+  dashboardActivity: (limit = 15, days = 30) =>
+    request<DashboardActivity>(`/dashboard/activity?limit=${limit}&days=${days}`),
 
   // ---------------------------------------------------------------------------
   // AI weekly review

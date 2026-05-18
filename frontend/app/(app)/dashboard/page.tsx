@@ -3,8 +3,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Sparkles } from "lucide-react";
 
+import { ActivityFeed } from "@/components/activity-feed";
 import { KpiCard } from "@/components/kpi-card";
 import { MrrChart } from "@/components/mrr-chart";
+import { MrrMovementsChart } from "@/components/mrr-movements-chart";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/api";
@@ -20,16 +22,24 @@ export default function DashboardPage() {
     queryKey: ["dashboard", "trends"],
     queryFn: () => api.dashboardTrends(12),
   });
+  const movements = useQuery({
+    queryKey: ["dashboard", "movements"],
+    queryFn: () => api.dashboardMovements(12),
+  });
   const topCustomers = useQuery({
     queryKey: ["dashboard", "top-customers"],
     queryFn: () => api.dashboardTopCustomers(5),
+  });
+  const activity = useQuery({
+    queryKey: ["dashboard", "activity"],
+    queryFn: () => api.dashboardActivity(),
   });
 
   return (
     <div className="px-10 py-10">
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-3xl font-semibold tracking-tight text-ink">
+          <h1 className="font-heading text-3xl font-bold tracking-tight text-ink">
             Dashboard
           </h1>
           <p className="mt-1 text-sm text-fade">
@@ -38,7 +48,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-5 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-5 md:grid-cols-3 lg:grid-cols-5">
         <KpiCard
           label="MRR"
           value={overview.data ? formatMoney(overview.data.mrr_cents) : "—"}
@@ -59,6 +69,22 @@ export default function DashboardPage() {
           value={overview.data ? formatChurn(overview.data.churn_rate) : "—"}
           delta={kpiDelta(overview.data?.churn_delta)}
         />
+        <KpiCard
+          label="Failed Payments"
+          value={
+            overview.data ? formatMoney(overview.data.failed_payments_cents) : "—"
+          }
+          delta={
+            overview.data
+              ? {
+                  value: `${overview.data.failed_payments_count} charge${
+                    overview.data.failed_payments_count === 1 ? "" : "s"
+                  }`,
+                  positive: overview.data.failed_payments_count === 0,
+                }
+              : undefined
+          }
+        />
       </div>
 
       <Card className="mt-8">
@@ -75,11 +101,43 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[2fr_1fr]">
-        <TopCustomersCard
-          rows={topCustomers.data?.customers ?? []}
-          loading={topCustomers.isLoading}
-        />
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>MRR movements</CardTitle>
+          <span className="font-heading text-xs text-fade">
+            new vs churn per month
+          </span>
+        </CardHeader>
+        <CardContent>
+          {movements.isLoading ? (
+            <ChartPlaceholder text="Loading…" />
+          ) : (
+            <MrrMovementsChart points={movements.data?.points ?? []} />
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="mt-8 grid gap-6 lg:grid-cols-[2fr_1fr]">
+        <div className="grid gap-6">
+          <TopCustomersCard
+            rows={topCustomers.data?.customers ?? []}
+            loading={topCustomers.isLoading}
+          />
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent activity</CardTitle>
+              <span className="font-heading text-xs text-fade">
+                last 30 days, newest first
+              </span>
+            </CardHeader>
+            <CardContent>
+              <ActivityFeed
+                events={activity.data?.events ?? []}
+                loading={activity.isLoading}
+              />
+            </CardContent>
+          </Card>
+        </div>
         <AIReviewCard />
       </div>
     </div>
@@ -184,10 +242,10 @@ function TopCustomersCard({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-line">
-                <th className="py-3 text-left font-heading text-xs font-medium uppercase tracking-wide text-fade">
+                <th className="py-3 text-left font-heading text-xs font-bold uppercase tracking-wide text-fade">
                   Customer
                 </th>
-                <th className="py-3 text-right font-heading text-xs font-medium uppercase tracking-wide text-fade">
+                <th className="py-3 text-right font-heading text-xs font-bold uppercase tracking-wide text-fade">
                   Revenue
                 </th>
               </tr>
@@ -196,12 +254,12 @@ function TopCustomersCard({
               {rows.map((c) => (
                 <tr key={c.stripe_customer_id} className="border-b border-line/60 last:border-0">
                   <td className="py-4 text-ink">
-                    <div className="font-medium">{c.name ?? c.stripe_customer_id}</div>
+                    <div className="font-semibold">{c.name ?? c.stripe_customer_id}</div>
                     {c.email && (
                       <div className="text-xs text-fade">{c.email}</div>
                     )}
                   </td>
-                  <td className="py-4 text-right font-heading text-ink">
+                  <td className="py-4 text-right font-heading font-bold text-ink">
                     {formatMoney(c.total_revenue_cents)}
                   </td>
                 </tr>

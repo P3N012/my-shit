@@ -28,6 +28,9 @@ class OverviewResponse(BaseModel):
     customers_delta: Optional[KpiDelta]
     churn_delta: Optional[KpiDelta]
 
+    failed_payments_count: int = 0
+    failed_payments_cents: int = 0
+
     period_days: int
 
 
@@ -40,6 +43,16 @@ class TrendsResponse(BaseModel):
     points: List[TrendPoint]
 
 
+class MovementPoint(BaseModel):
+    month_start: datetime
+    new_mrr_cents: int
+    churn_mrr_cents: int
+
+
+class MovementsResponse(BaseModel):
+    points: List[MovementPoint]
+
+
 class TopCustomerEntry(BaseModel):
     stripe_customer_id: str
     name: Optional[str]
@@ -49,3 +62,16 @@ class TopCustomerEntry(BaseModel):
 
 class TopCustomersResponse(BaseModel):
     customers: List[TopCustomerEntry]
+
+
+class ActivityEventResponse(BaseModel):
+    kind: str
+    timestamp: datetime
+    customer_name: Optional[str]
+    customer_email: Optional[str]
+    amount_cents: int
+    description: str
+
+
+class ActivityResponse(BaseModel):
+    events: List[ActivityEventResponse]

@@ -309,7 +309,7 @@ def test_top_customers_ignores_failed_charges(client, auth_tokens, org_id, db_se
 # ---------------------------------------------------------------------------
 
 def test_dashboard_routes_require_org_header(client, auth_tokens):
-    for path in ("overview", "trends", "top-customers"):
+    for path in ("overview", "trends", "top-customers", "movements", "activity"):
         r = client.get(
             f"/api/v1/dashboard/{path}", headers=_auth_header(auth_tokens)
         )
@@ -317,9 +317,195 @@ def test_dashboard_routes_require_org_header(client, auth_tokens):
 
 
 def test_dashboard_routes_reject_foreign_org(client, auth_tokens):
-    for path in ("overview", "trends", "top-customers"):
+    for path in ("overview", "trends", "top-customers", "movements", "activity"):
         r = client.get(
             f"/api/v1/dashboard/{path}",
             headers={**_auth_header(auth_tokens), "X-Organization-Id": "999"},
         )
         assert r.status_code == 403, path
+
+
+# ---------------------------------------------------------------------------
+# Failed payments (lives on /overview)
+# ---------------------------------------------------------------------------
+
+def test_overview_counts_failed_payments_in_window(client, auth_tokens, org_id, db_session):
+    conn = _make_connection(db_session, org_id)
+    now = datetime.now(timezone.utc)
+
+    # Two failed charges in window, one succeeded (ignored), one failed but old (ignored).
+    db_session.add_all([
+        StripeCharge(
+            connection_id=conn.id,
+            stripe_charge_id="ch_failed_1",
+            amount=9900,
+            currency="usd",
+            status="failed",
+            paid=False,
+            stripe_created_at=now - timedelta(days=2),
+        ),
+        StripeCharge(
+            connection_id=conn.id,
+            stripe_charge_id="ch_failed_2",
+            amount=2900,
+            currency="usd",
+            status="failed",
+            paid=False,
+            stripe_created_at=now - timedelta(days=10),
+        ),
+        StripeCharge(
+            connection_id=conn.id,
+            stripe_charge_id="ch_success",
+            amount=99900,
+            currency="usd",
+            status="succeeded",
+            paid=True,
+            stripe_created_at=now - timedelta(days=5),
+        ),
+        StripeCharge(
+            connection_id=conn.id,
+            stripe_charge_id="ch_failed_old",
+            amount=99900,
+            currency="usd",
+            status="failed",
+            paid=False,
+            stripe_created_at=now - timedelta(days=60),
+        ),
+    ])
+    db_session.commit()
+
+    r = client.get("/api/v1/dashboard/overview", headers=_full_headers(auth_tokens, org_id))
+    body = r.json()
+    assert body["failed_payments_count"] == 2
+    assert body["failed_payments_cents"] == 9900 + 2900
+
+
+# ---------------------------------------------------------------------------
+# MRR movements
+# ---------------------------------------------------------------------------
+
+def test_movements_records_new_and_churn(client, auth_tokens, org_id, db_session):
+    conn = _make_connection(db_session, org_id)
+    now = datetime.now(timezone.utc)
+    this_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    # Sub created this month (counts as new this month)
+    _add_active_sub(
+        db_session, conn.id, "cus_new", 2900, started_days_ago=2,
+    )
+    # Sub canceled this month (counts as churn this month). started_at way back.
+    canceled_at = now - timedelta(days=3)
+    db_session.add(StripeSubscription(
+        connection_id=conn.id,
+        stripe_subscription_id="sub_canc",
+        stripe_customer_id="cus_canc",
+        status="canceled",
+        currency="usd",
+        amount_per_period=9900,
+        interval="month",
+        interval_count=1,
+        started_at=now - timedelta(days=300),
+        canceled_at=canceled_at,
+        ended_at=canceled_at,
+        stripe_created_at=now - timedelta(days=300),
+    ))
+    db_session.commit()
+
+    r = client.get(
+        "/api/v1/dashboard/movements?months=12",
+        headers=_full_headers(auth_tokens, org_id),
+    )
+    body = r.json()
+    assert len(body["points"]) == 12
+    # The last point (current month) holds both
+    last = body["points"][-1]
+    assert last["new_mrr_cents"] == 2900
+    assert last["churn_mrr_cents"] == 9900
+
+
+def test_movements_is_empty_without_connection(client, auth_tokens, org_id):
+    r = client.get(
+        "/api/v1/dashboard/movements", headers=_full_headers(auth_tokens, org_id)
+    )
+    assert r.json()["points"] == []
+
+
+# ---------------------------------------------------------------------------
+# Activity feed
+# ---------------------------------------------------------------------------
+
+def test_activity_feed_orders_newest_first(client, auth_tokens, org_id, db_session):
+    conn = _make_connection(db_session, org_id)
+    now = datetime.now(timezone.utc)
+
+    # Seed one of each kind, with distinct timestamps so order is stable.
+    db_session.add(StripeCustomer(
+        connection_id=conn.id,
+        stripe_customer_id="cus_a",
+        name="Acme Labs",
+        currency="usd",
+        stripe_created_at=now - timedelta(days=10),
+    ))
+    db_session.add(StripeSubscription(
+        connection_id=conn.id,
+        stripe_subscription_id="sub_new",
+        stripe_customer_id="cus_a",
+        status="active",
+        currency="usd",
+        amount_per_period=9900,
+        interval="month",
+        interval_count=1,
+        started_at=now - timedelta(days=5),
+        stripe_metadata={"plan": "Pro"},
+        stripe_created_at=now - timedelta(days=5),
+    ))
+    db_session.add(StripeCharge(
+        connection_id=conn.id,
+        stripe_charge_id="ch_fail",
+        stripe_customer_id="cus_a",
+        amount=9900,
+        currency="usd",
+        status="failed",
+        paid=False,
+        stripe_created_at=now - timedelta(hours=2),
+        failure_message="Your card was declined.",
+    ))
+    db_session.commit()
+
+    r = client.get(
+        "/api/v1/dashboard/activity",
+        headers=_full_headers(auth_tokens, org_id),
+    )
+    events = r.json()["events"]
+    assert len(events) == 2
+    assert events[0]["kind"] == "charge_failed"             # most recent first
+    assert events[0]["description"] == "Your card was declined."
+    assert events[1]["kind"] == "subscription_started"
+    assert events[1]["description"] == "Subscribed to Pro"
+    # Both events resolved the customer name
+    assert all(e["customer_name"] == "Acme Labs" for e in events)
+
+
+def test_activity_feed_skips_events_outside_window(client, auth_tokens, org_id, db_session):
+    conn = _make_connection(db_session, org_id)
+    now = datetime.now(timezone.utc)
+    # 90 days ago — outside the default 30-day window
+    db_session.add(StripeSubscription(
+        connection_id=conn.id,
+        stripe_subscription_id="sub_old",
+        stripe_customer_id="cus_x",
+        status="active",
+        currency="usd",
+        amount_per_period=2900,
+        interval="month",
+        interval_count=1,
+        started_at=now - timedelta(days=90),
+        stripe_created_at=now - timedelta(days=90),
+    ))
+    db_session.commit()
+
+    r = client.get(
+        "/api/v1/dashboard/activity?days=30",
+        headers=_full_headers(auth_tokens, org_id),
+    )
+    assert r.json()["events"] == []
