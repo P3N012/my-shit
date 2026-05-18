@@ -54,7 +54,7 @@ export function MrrChart({ points }: { points: DashboardTrendPoint[] }) {
         <BarChart
           data={data}
           margin={{ top: 16, right: 8, left: 0, bottom: 0 }}
-          barCategoryGap="22%"
+          barCategoryGap="12%"
         >
           <defs>
             {/* Vertical gradient inside each bar — accent at top, lighter
@@ -64,12 +64,11 @@ export function MrrChart({ points }: { points: DashboardTrendPoint[] }) {
               <stop offset="0%" stopColor={ACCENT} />
               <stop offset="100%" stopColor={ACCENT_MUTED} />
             </linearGradient>
-            {/* Subtle Gaussian-blur glow — just enough to make the bars
-                look slightly emissive rather than flat. Was stdDeviation=6
-                (literal halo); 2 reads as warmth. Drop the filter entirely
-                if you want razor-sharp bars. */}
-            <filter id="ember-glow" x="-30%" y="-30%" width="160%" height="160%">
-              <feGaussianBlur stdDeviation="2" result="blur" />
+            {/* Barely-there glow. Was 6 (literal halo) → 2 (warm) → 1
+                (just enough that the bars don't look pasted-on). Remove
+                the filter entirely if you want razor-sharp edges. */}
+            <filter id="ember-glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="1" result="blur" />
               <feMerge>
                 <feMergeNode in="blur" />
                 <feMergeNode in="SourceGraphic" />

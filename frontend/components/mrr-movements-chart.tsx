@@ -56,7 +56,7 @@ export function MrrMovementsChart({ points }: { points: DashboardMovementPoint[]
           data={data}
           margin={{ top: 16, right: 8, left: 0, bottom: 0 }}
           stackOffset="sign"
-          barCategoryGap="22%"
+          barCategoryGap="12%"
         >
           <CartesianGrid stroke={GRID} strokeDasharray="0" vertical={false} />
           <XAxis
