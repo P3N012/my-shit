@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit -m 'Add deploy configs: Procfile, render.yaml, DEPLOY.md *)",
+      "Bash(git push *)"
+    ]
+  }
+}
