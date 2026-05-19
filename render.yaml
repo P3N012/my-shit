@@ -1,0 +1,82 @@
+# Render Blueprint — Infrastructure as Code config that Render reads
+# when you connect this repo. Defines one web service for the FastAPI
+# backend. Postgres lives separately on Neon; Redis isn't provisioned
+# here because the synchronous endpoints don't need it (the inline-
+# fallback path in /connections/{id}/sync covers manual syncs).
+#
+# After connecting the repo, Render will offer to use this blueprint.
+# The `sync: false` env vars are the ones you fill in via the
+# dashboard — secrets, URLs, etc. that depend on values you don't
+# have yet (your Neon DATABASE_URL, your Vercel frontend URL, etc.).
+# `generateValue: true` lets Render mint a strong random JWT secret
+# so you don't have to.
+
+services:
+  - type: web
+    name: insightplus-backend
+    runtime: python
+    plan: free
+    autoDeploy: true                # redeploy on every push to main
+    buildCommand: pip install -r requirements.txt
+    preDeployCommand: alembic upgrade head
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+
+    envVars:
+      # ----- Frozen config (safe to commit) -----
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: ENVIRONMENT
+        value: production
+      - key: AI_ENABLED
+        value: "true"
+      - key: RATE_LIMIT_ENABLED
+        value: "true"
+      - key: ANTHROPIC_MODEL
+        value: claude-opus-4-7
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "30"
+
+      # ----- Auto-generated secrets (Render mints these for you) -----
+      - key: ACCESS_TOKEN_SECRET
+        generateValue: true
+      - key: REFRESH_TOKEN_SECRET
+        generateValue: true
+
+      # ----- You fill these in via the dashboard -----
+      # Neon connection string. Format:
+      #   postgresql+psycopg2://user:pass@host/dbname?sslmode=require
+      # Note: prepend `postgresql+psycopg2://` even if Neon gives you
+      # plain `postgresql://` — SQLAlchemy needs the driver hint.
+      - key: DATABASE_URL
+        sync: false
+
+      # CORS — set this to your Vercel domain after frontend deploys.
+      #   e.g. https://insightplus.vercel.app
+      - key: CORS_ORIGINS
+        sync: false
+
+      # Anthropic (optional — /ai/* endpoints 503 cleanly without it).
+      - key: ANTHROPIC_API_KEY
+        sync: false
+
+      # Stripe Connect (optional — /connections/stripe/connect 503s
+      # cleanly without these; the rest of the app works fine).
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_CONNECT_CLIENT_ID
+        sync: false
+      # These three must use the deployed URLs, not localhost. Update
+      # after both Render + Vercel are live:
+      #   STRIPE_OAUTH_REDIRECT_URI = https://<render-url>/api/v1/connections/stripe/callback
+      #   STRIPE_OAUTH_SUCCESS_URL  = https://<vercel-url>/oauth/stripe?stripe=ok
+      #   STRIPE_OAUTH_FAILURE_URL  = https://<vercel-url>/oauth/stripe?stripe=error
+      # And the redirect URI must be added to Stripe Connect → Settings → Integration.
+      - key: STRIPE_OAUTH_REDIRECT_URI
+        sync: false
+      - key: STRIPE_OAUTH_SUCCESS_URL
+        sync: false
+      - key: STRIPE_OAUTH_FAILURE_URL
+        sync: false
