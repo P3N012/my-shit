@@ -37,7 +37,7 @@ frontend/
 │   ├── oauth/stripe/page.tsx    public Stripe Connect callback landing
 │   └── (app)/                   authed app shell
 │       ├── layout.tsx           sidebar + auth guard
-│       ├── dashboard/           KPI cards, MRR chart, AI review (placeholder data)
+│       ├── dashboard/           KPI cards, MRR chart, MRR movements, activity feed, AI review
 │       ├── connections/         list, sync, OAuth start, delete
 │       ├── ai-assistant/        chat against /ai/messages
 │       ├── usage/               wired to /ai/usage
@@ -84,6 +84,7 @@ frontend/
 | AI Assistant | `POST /ai/messages` (single-shot; SSE streaming TBD) |
 | Usage | `GET /ai/usage` |
 | Dashboard KPIs + MRR chart + top customers | `GET /dashboard/overview`, `/trends`, `/top-customers` — computed in Python from the mirrored Stripe tables. |
+| MRR movements chart + activity feed | `GET /dashboard/movements`, `/dashboard/activity` — per-month new vs. churned MRR and a recent-events feed. |
 | AI weekly review card | `GET /ai/reviews/latest` + `POST /ai/reviews/generate` — Claude reads the past 7 days of aggregates and writes a 3-paragraph commentary. |
 
 ## Auth model on the client
@@ -101,7 +102,5 @@ frontend/
 ## Known gaps / next up
 
 - Streaming responses for the AI Assistant (SSE from `/ai/messages/stream`).
-- Real dashboard aggregates (backend PR C).
-- Real AI weekly review (backend PR D).
 - Form-validation polish (zod + react-hook-form).
 - E2E tests (Playwright).
