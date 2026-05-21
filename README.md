@@ -5,8 +5,8 @@ Two halves of one repo:
 
 - **Backend** (this directory) — FastAPI + Postgres + arq + Anthropic.
   Auth, multi-tenancy, Stripe Connect, sync, AI calls + usage tracking.
-- **Frontend** (`frontend/`) — Next.js 14 + Tailwind, dark monochrome
-  design. Talks to the backend over `/api/v1/*`.
+- **Frontend** (`frontend/`) — Next.js 14 + Tailwind, "Ember Glow"
+  dark theme. Talks to the backend over `/api/v1/*`.
 
 See `frontend/README.md` for the frontend's own walkthrough.
 
@@ -208,6 +208,8 @@ Stripe Connect OAuth and connected-data-source management.
 | GET    | `/dashboard/overview`         | Current MRR, ARR, active customer count, churn rate (+ 30d deltas).   |
 | GET    | `/dashboard/trends`           | 12 end-of-month MRR samples for the chart.                            |
 | GET    | `/dashboard/top-customers`    | Top N customers by revenue over the last 90 days.                     |
+| GET    | `/dashboard/movements`        | Per-month new vs. churned MRR movements for the chart.               |
+| GET    | `/dashboard/activity`         | Recent account activity feed (signups, payments, churn).            |
 
 ### AI (`/ai`) — org-scoped, requires `X-Organization-Id` header
 
