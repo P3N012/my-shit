@@ -48,9 +48,10 @@ Upstash later if you start using async jobs.
    ones), set:
    - `DATABASE_URL` → the Neon string from step 1.
    - Leave the rest blank for now — you'll fill them after step 3.
-4. Trigger a manual deploy. The `release: alembic upgrade head` line
-   runs *before* the web process gets traffic, so your schema lands.
-   On first deploy this creates every table.
+4. Trigger a manual deploy. Migrations run as part of the start command
+   (`alembic upgrade head && uvicorn …`) because Render's free tier
+   doesn't allow a separate pre-deploy phase. On first boot this
+   creates every table; on later boots it no-ops.
 5. Once "Live" shows in the dashboard, copy your Render URL. It'll
    look like:
    ```
