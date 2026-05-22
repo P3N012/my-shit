@@ -169,6 +169,13 @@ export const api = {
       orgScoped: false,
     }),
 
+  demoLogin: () =>
+    request<TokenResponse>("/auth/demo", {
+      method: "POST",
+      authed: false,
+      orgScoped: false,
+    }),
+
   me: () => request<User>("/auth/me", { orgScoped: false }),
 
   logout: (refresh_token: string) =>

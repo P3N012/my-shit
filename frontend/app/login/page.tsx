@@ -18,12 +18,13 @@ const FEATURES = [
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, loading, login, register } = useAuth();
+  const { user, loading, login, loginDemo, register } = useAuth();
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,6 +51,24 @@ export default function LoginPage() {
       setError(message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const onDemo = async () => {
+    setError(null);
+    setDemoLoading(true);
+    try {
+      await loginDemo();
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.detail
+          : err instanceof Error
+            ? err.message
+            : "Couldn't start the demo";
+      setError(message);
+    } finally {
+      setDemoLoading(false);
     }
   };
 
@@ -126,6 +145,26 @@ export default function LoginPage() {
               {submitting ? "Working…" : isRegister ? "Create account" : "Sign in"}
             </Button>
           </form>
+
+          <div className="my-6 flex items-center gap-3">
+            <span className="h-px flex-1 bg-line" />
+            <span className="text-xs uppercase tracking-wide text-fade">or</span>
+            <span className="h-px flex-1 bg-line" />
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 w-full text-sm"
+            onClick={onDemo}
+            disabled={demoLoading || submitting}
+          >
+            <Sparkles className="h-4 w-4 text-accent" />
+            {demoLoading ? "Loading demo…" : "Try the live demo"}
+          </Button>
+          <p className="mt-2 text-center text-xs text-fade">
+            Explore a fully populated account — no signup required.
+          </p>
 
           <div className="mt-6 text-center text-sm text-mute">
             {isRegister ? "Already have an account? " : "Don't have an account? "}

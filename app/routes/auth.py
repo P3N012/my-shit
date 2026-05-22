@@ -95,6 +95,26 @@ def login(
 
 
 @router.post(
+    "/demo",
+    response_model=TokenResponse,
+    responses={404: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
+)
+@limiter.limit(settings.RATE_LIMIT_LOGIN)
+def demo_login(request: Request, db: Session = Depends(get_db)):
+    """
+    One-click login into the shared, pre-seeded demo account — no
+    credentials required. Lets a reviewer see the populated dashboard
+    without registering. Returns 404 when demo mode is disabled.
+    """
+    if not settings.DEMO_LOGIN_ENABLED:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Demo login is disabled")
+
+    user = AuthService.ensure_demo_user(db)
+    access_token, refresh_token = AuthService.issue_tokens(db, user.id)
+    return _token_response(access_token, refresh_token)
+
+
+@router.post(
     "/refresh",
     response_model=TokenResponse,
     responses={401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},

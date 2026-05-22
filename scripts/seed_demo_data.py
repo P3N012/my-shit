@@ -37,6 +37,7 @@ from app.models import (
     StripeSubscription,
     User,
 )
+from app.services.auth_service import AuthService
 
 
 # ---------------------------------------------------------------------------
@@ -326,6 +327,11 @@ def main() -> None:
 
     db = SessionLocal()
     try:
+        # Make sure the shared demo account exists so the one-click demo
+        # login lands on a populated dashboard.
+        demo = AuthService.ensure_demo_user(db)
+        print(f"Demo account ready: {demo.email}")
+
         users = db.query(User).all()
         if not users:
             print("No users found. Run scripts/seed_db.py first.")
