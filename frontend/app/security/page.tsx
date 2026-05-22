@@ -1,9 +1,7 @@
 import {
   ArrowLeft,
-  ArrowRight,
   CreditCard,
   Eye,
-  Github,
   KeyRound,
   Lock,
   ShieldCheck,
@@ -16,17 +14,14 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Security — InsightPlus",
   description:
-    "How InsightPlus handles your Stripe data: read-only access, encryption at rest, and an open-source codebase you can audit.",
+    "How InsightPlus handles your Stripe data: read-only access, encryption at rest, and data you can delete any time.",
 };
-
-const REPO = "https://github.com/P3N012/insightplus";
 
 const CHIPS = [
   { icon: Eye, label: "Read-only" },
   { icon: Lock, label: "Encrypted at rest" },
   { icon: CreditCard, label: "No card data" },
   { icon: Trash2, label: "Disconnect deletes all" },
-  { icon: Github, label: "Open source" },
 ];
 
 const GUARANTEES = [
@@ -92,6 +87,49 @@ const GUARANTEES = [
       <>
         A one-click demo runs on fully synthetic data, so you can evaluate the entire product
         before connecting anything real.
+      </>
+    ),
+  },
+];
+
+const HOW_IT_WORKS = [
+  {
+    title: "When you connect",
+    body: (
+      <>
+        You generate a restricted key in Stripe and grant it read permission on just three
+        resources — customers, subscriptions, and charges. We check the key is a restricted
+        key and refuse full secret keys, so write access is never even on the table.
+      </>
+    ),
+  },
+  {
+    title: "How the key is stored",
+    body: (
+      <>
+        Before it&apos;s written to the database, the key is encrypted with AES (Fernet). It&apos;s
+        decrypted only in memory, only while we&apos;re pulling your latest numbers, and it&apos;s
+        never included in any API response.
+      </>
+    ),
+  },
+  {
+    title: "What we read, and when",
+    body: (
+      <>
+        On each sync we read your customers, subscriptions, and charges from the last 90 days
+        and mirror the metadata we need to compute your metrics. Every request is authenticated
+        and scoped to your workspace before any data is returned.
+      </>
+    ),
+  },
+  {
+    title: "When you leave",
+    body: (
+      <>
+        Disconnecting removes your key and cascade-deletes every synced row tied to that
+        account. Revoking the key in Stripe cuts off access independently — you never have to
+        rely on us to do it.
       </>
     ),
   },
@@ -185,40 +223,30 @@ export default function SecurityPage() {
           ))}
         </section>
 
-        {/* Open source */}
-        <section className="stripe-ember relative mt-6 overflow-hidden rounded-xl border border-line bg-panel p-7">
-          <div className="flex items-center gap-2.5">
-            <Github className="h-5 w-5 text-accent" />
-            <h2 className="font-heading text-xl font-semibold text-ink">
-              Don&apos;t take our word for it
-            </h2>
-          </div>
-          <p className="mt-3 max-w-2xl text-sm leading-relaxed">
-            The entire codebase is public. Read the exact code that touches your data — no
-            marketing claims, just the source:
+        {/* How it works */}
+        <section className="stripe-ember relative mt-6 overflow-hidden rounded-xl border border-line bg-panel p-7 lg:p-9">
+          <h2 className="font-heading text-xl font-semibold text-ink">
+            How it works, step by step
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed">
+            The short version of what happens to your data, from the moment you connect to the
+            moment you leave.
           </p>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <SourceLink
-              href={`${REPO}/blob/main/app/core/crypto.py`}
-              path="app/core/crypto.py"
-              note="How credentials are encrypted at rest"
-            />
-            <SourceLink
-              href={`${REPO}/blob/main/app/services/stripe_apikey_service.py`}
-              path="app/services/stripe_apikey_service.py"
-              note="Read-only key handling; secret keys rejected"
-            />
-          </div>
-          <a
-            className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-ink hover:text-accent"
-            href={REPO}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <Github className="h-4 w-4" />
-            View the full repository
-            <ArrowRight className="h-4 w-4" />
-          </a>
+          <ol className="mt-6 space-y-5">
+            {HOW_IT_WORKS.map((step, i) => (
+              <li key={step.title} className="flex gap-4">
+                <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-accent/15 font-heading text-xs font-bold text-accent">
+                  {i + 1}
+                </span>
+                <div>
+                  <h3 className="font-heading text-sm font-semibold text-ink">
+                    {step.title}
+                  </h3>
+                  <p className="mt-1 text-sm leading-relaxed">{step.body}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
         </section>
 
         {/* CTA */}
@@ -241,16 +269,8 @@ export default function SecurityPage() {
         {/* Contact / footer */}
         <footer className="mt-10 border-t border-line pt-6 text-sm">
           <p>
-            Built by{" "}
-            <a
-              className="font-semibold text-ink hover:text-accent"
-              href="https://github.com/P3N012"
-              target="_blank"
-              rel="noreferrer"
-            >
-              @P3N012
-            </a>
-            . Security questions or disclosures:{" "}
+            Built by <span className="font-semibold text-ink">P3N012</span>. Security questions
+            or disclosures:{" "}
             <a
               className="font-semibold text-accent hover:underline"
               href="mailto:p3n012@gmail.com"
@@ -262,29 +282,5 @@ export default function SecurityPage() {
         </footer>
       </main>
     </div>
-  );
-}
-
-function SourceLink({
-  href,
-  path,
-  note,
-}: {
-  href: string;
-  path: string;
-  note: string;
-}) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      className="group rounded-lg border border-line bg-base p-4 transition-colors hover:border-accent/40"
-    >
-      <div className="font-heading text-sm font-semibold text-accent group-hover:underline">
-        {path}
-      </div>
-      <div className="mt-1 text-xs text-fade">{note}</div>
-    </a>
   );
 }

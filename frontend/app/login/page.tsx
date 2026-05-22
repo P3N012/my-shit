@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Eye, Github, Lock, Sparkles } from "lucide-react";
+import { Check, CreditCard, Eye, Lock, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
@@ -190,7 +190,7 @@ export default function LoginPage() {
                 <Eye className="h-3 w-3" /> Read-only
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <Github className="h-3 w-3" /> Open source
+                <CreditCard className="h-3 w-3" /> No card data
               </span>
             </div>
             <div className="mt-3 text-center">
