@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, Sparkles } from "lucide-react";
+import { Check, Eye, Github, Lock, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
 
@@ -178,6 +179,28 @@ export default function LoginPage() {
             >
               {isRegister ? "Sign in" : "Sign up"}
             </button>
+          </div>
+
+          <div className="mt-8 border-t border-line pt-5">
+            <div className="flex items-center justify-center gap-4 text-[11px] text-fade">
+              <span className="inline-flex items-center gap-1.5">
+                <Lock className="h-3 w-3" /> Encrypted
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Eye className="h-3 w-3" /> Read-only
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Github className="h-3 w-3" /> Open source
+              </span>
+            </div>
+            <div className="mt-3 text-center">
+              <Link
+                href="/security"
+                className="text-xs font-semibold text-mute hover:text-accent"
+              >
+                How we handle your data →
+              </Link>
+            </div>
           </div>
         </div>
       </div>
