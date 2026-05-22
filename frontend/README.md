@@ -1,7 +1,7 @@
 # InsightPlus — frontend
 
-Next.js 14 (App Router) + TypeScript + Tailwind. Ports the **"Monochrome
-Authority"** direction from the Claude Design handoff and wires it to
+Next.js 14 (App Router) + TypeScript + Tailwind. Ports the **"Ember Glow"**
+direction (Direction 5) from the Claude Design handoff and wires it to
 the FastAPI backend.
 
 ## Stack
@@ -12,7 +12,7 @@ the FastAPI backend.
   (Radix Slot + class-variance-authority + Tailwind). No CLI install
   step — the components live in-tree.
 - **Data**: TanStack Query against `/api/v1/*`
-- **Fonts**: `next/font/google` → JetBrains Mono (heading) + IBM Plex Sans (body)
+- **Fonts**: `next/font/google` → Manrope (single typeface; `.font-heading` is Manrope at weight 700)
 
 ## Run
 
@@ -37,7 +37,8 @@ frontend/
 │   ├── oauth/stripe/page.tsx    public Stripe Connect callback landing
 │   └── (app)/                   authed app shell
 │       ├── layout.tsx           sidebar + auth guard
-│       ├── dashboard/           KPI cards, MRR chart, AI review (placeholder data)
+│       ├── dashboard/           KPI cards, MRR chart, MRR movements, activity feed, AI review
+│       ├── customers/[id]/      per-customer drill-down (subs, charges, MRR, LTV)
 │       ├── connections/         list, sync, OAuth start, delete
 │       ├── ai-assistant/        chat against /ai/messages
 │       ├── usage/               wired to /ai/usage
@@ -47,6 +48,7 @@ frontend/
 │   ├── providers.tsx            TanStack Query + AuthProvider
 │   ├── sidebar.tsx              nav, org switcher, user dropdown
 │   ├── kpi-card.tsx, mrr-chart.tsx
+│   ├── mrr-movements-chart.tsx, activity-feed.tsx
 │   └── ui/                      button, card, input, label, badge
 ├── lib/
 │   ├── api.ts                   single fetch wrapper with refresh-token rotation
@@ -54,22 +56,24 @@ frontend/
 │   ├── format.ts                money + relative-time
 │   ├── types.ts                 mirrors backend pydantic shapes
 │   └── utils.ts                 cn()
-└── tailwind.config.ts           Direction 1 design tokens
+└── tailwind.config.ts           Ember Glow design tokens
 ```
 
-## Design tokens (Direction 1 — Monochrome Authority)
+## Design tokens (Ember Glow — Direction 5)
 
 | Token | Value | Use |
 |---|---|---|
-| `bg-base` | `#0a0a0a` | App background |
-| `bg-panel` | `#000000` | Cards, sidebar |
-| `border-line` | `#1a1a1a` | Hairlines |
+| `bg-base` | `#0f0f0f` | App background (warm near-black) |
+| `bg-panel` | `#1a1a1a` | Cards, sidebar |
+| `bg-elev` | `#222222` | Elevated surfaces |
+| `border-line` | `#2a2a2a` | Hairlines |
 | `text-ink` | `#ffffff` | Primary text |
-| `text-mute` | `#888` | Secondary |
-| `text-fade` | `#666` | Tertiary, captions |
-| `bg-accent` / `text-accent` | `oklch(0.65 0.24 142)` | Cyan-green highlight |
-| `font-heading` | JetBrains Mono | KPIs, headings, labels, badges |
-| `font-sans` | IBM Plex Sans | Body, table cells, prose |
+| `text-mute` | `#888888` | Secondary |
+| `text-fade` | `#666666` | Tertiary, captions |
+| `bg-accent` / `text-accent` | `#ff6b35` | Vibrant orange highlight |
+| `accent-muted` | `#ff8659` | Lighter companion for gradient fills |
+| `stripe` | `#635bff` | Stripe brand purple |
+| `font-sans` / `font-heading` | Manrope | Single typeface; `font-heading` is weight 700 |
 
 ## What's wired vs. what's placeholder
 
@@ -84,6 +88,8 @@ frontend/
 | AI Assistant | `POST /ai/messages` (single-shot; SSE streaming TBD) |
 | Usage | `GET /ai/usage` |
 | Dashboard KPIs + MRR chart + top customers | `GET /dashboard/overview`, `/trends`, `/top-customers` — computed in Python from the mirrored Stripe tables. |
+| MRR movements + activity feed | `GET /dashboard/movements`, `/dashboard/activity`. The quick-ratio header on the movements card is derived client-side from the movements data (new MRR / churned MRR over the trailing 12 months). |
+| Customer drill-down | `GET /dashboard/customers/{id}` — `/customers/[id]` route with KPI cards (current MRR, LTV, active subs), subscriptions table, and charges table. Linked from Top Customers rows. |
 | AI weekly review card | `GET /ai/reviews/latest` + `POST /ai/reviews/generate` — Claude reads the past 7 days of aggregates and writes a 3-paragraph commentary. |
 
 ## Auth model on the client
@@ -101,7 +107,5 @@ frontend/
 ## Known gaps / next up
 
 - Streaming responses for the AI Assistant (SSE from `/ai/messages/stream`).
-- Real dashboard aggregates (backend PR C).
-- Real AI weekly review (backend PR D).
 - Form-validation polish (zod + react-hook-form).
 - E2E tests (Playwright).

@@ -5,7 +5,7 @@ Two halves of one repo:
 
 - **Backend** (this directory) — FastAPI + Postgres + arq + Anthropic.
   Auth, multi-tenancy, Stripe Connect, sync, AI calls + usage tracking.
-- **Frontend** (`frontend/`) — Next.js 14 + Tailwind, dark monochrome
+- **Frontend** (`frontend/`) — Next.js 14 + Tailwind, "Ember Glow"
   design. Talks to the backend over `/api/v1/*`.
 
 See `frontend/README.md` for the frontend's own walkthrough.
@@ -203,11 +203,14 @@ Stripe Connect OAuth and connected-data-source management.
 
 ### Dashboard (`/dashboard`) — org-scoped
 
-| Method | Path                          | Description                                                          |
-| ------ | ----------------------------- | -------------------------------------------------------------------- |
-| GET    | `/dashboard/overview`         | Current MRR, ARR, active customer count, churn rate (+ 30d deltas).   |
-| GET    | `/dashboard/trends`           | 12 end-of-month MRR samples for the chart.                            |
-| GET    | `/dashboard/top-customers`    | Top N customers by revenue over the last 90 days.                     |
+| Method | Path                                    | Description                                                          |
+| ------ | --------------------------------------- | -------------------------------------------------------------------- |
+| GET    | `/dashboard/overview`                   | Current MRR, ARR, active customer count, churn rate (+ 30d deltas).   |
+| GET    | `/dashboard/trends`                     | 12 end-of-month MRR samples for the chart.                           |
+| GET    | `/dashboard/top-customers`              | Top N customers by revenue over the last 90 days.                    |
+| GET    | `/dashboard/movements`                  | 12 months of new vs. churned MRR movements.                         |
+| GET    | `/dashboard/activity`                   | Recent customer / subscription / charge events (most recent first).  |
+| GET    | `/dashboard/customers/{stripe_customer_id}` | One customer's drill-down: subscriptions, charges, current MRR, LTV (404 if not in this org). |
 
 ### AI (`/ai`) — org-scoped, requires `X-Organization-Id` header
 
