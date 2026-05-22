@@ -103,6 +103,105 @@ def test_stripe_connect_requires_auth(client, org_id, stripe_configured):
 
 
 # ---------------------------------------------------------------------------
+# POST /connections/stripe/api-key  (read-only restricted key)
+# ---------------------------------------------------------------------------
+
+def test_api_key_connect_creates_read_only_connection(
+    client, auth_tokens, org_id, db_session
+):
+    fake_account = {
+        "id": "acct_rk_real",
+        "business_profile": {"name": "Acme Coffee Co."},
+        "settings": {},
+        "email": "ops@acme.test",
+        "livemode": False,
+    }
+    with patch(
+        "app.services.stripe_apikey_service.stripe.Account.retrieve",
+        return_value=fake_account,
+    ):
+        r = client.post(
+            "/api/v1/connections/stripe/api-key",
+            headers=_full_headers(auth_tokens, org_id),
+            json={"api_key": "rk_test_abc123"},
+        )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["auth_method"] == "restricted_key"
+    assert body["account_id"] == "acct_rk_real"
+    assert body["account_name"] == "Acme Coffee Co."
+    # Never leak the key.
+    assert "rk_test_abc123" not in repr(body)
+    assert "access_token" not in body
+
+    conn = (
+        db_session.query(PlatformConnection)
+        .filter(PlatformConnection.account_id == "acct_rk_real")
+        .one()
+    )
+    assert conn.scope == "read_only"
+    assert conn.refresh_token is None
+    assert conn.access_token == "rk_test_abc123"  # decrypted via the ORM
+
+
+def test_api_key_connect_rejects_secret_key(client, auth_tokens, org_id):
+    r = client.post(
+        "/api/v1/connections/stripe/api-key",
+        headers=_full_headers(auth_tokens, org_id),
+        json={"api_key": "sk_live_dangerous"},
+    )
+    assert r.status_code == 400
+    assert "restricted" in r.json()["detail"].lower()
+
+
+def test_api_key_connect_rejects_non_key(client, auth_tokens, org_id):
+    r = client.post(
+        "/api/v1/connections/stripe/api-key",
+        headers=_full_headers(auth_tokens, org_id),
+        json={"api_key": "totally-not-a-key"},
+    )
+    assert r.status_code == 400
+
+
+def test_api_key_connect_falls_back_without_account_read(
+    client, auth_tokens, org_id, db_session
+):
+    """A key without Account read still connects via a Customers probe."""
+    import stripe as stripe_lib
+
+    with patch(
+        "app.services.stripe_apikey_service.stripe.Account.retrieve",
+        side_effect=stripe_lib.error.PermissionError("no account read"),
+    ), patch(
+        "app.services.stripe_apikey_service.stripe.Customer.list",
+        return_value=MagicMock(),
+    ):
+        r = client.post(
+            "/api/v1/connections/stripe/api-key",
+            headers=_full_headers(auth_tokens, org_id),
+            json={"api_key": "rk_live_minimal"},
+        )
+    assert r.status_code == 201, r.text
+    assert r.json()["account_id"].startswith("acct_rk_")
+
+
+def test_api_key_connect_rejects_invalid_key(client, auth_tokens, org_id):
+    import stripe as stripe_lib
+
+    with patch(
+        "app.services.stripe_apikey_service.stripe.Account.retrieve",
+        side_effect=stripe_lib.error.AuthenticationError("bad key"),
+    ):
+        r = client.post(
+            "/api/v1/connections/stripe/api-key",
+            headers=_full_headers(auth_tokens, org_id),
+            json={"api_key": "rk_test_invalid"},
+        )
+    assert r.status_code == 400
+    assert "invalid" in r.json()["detail"].lower()
+
+
+# ---------------------------------------------------------------------------
 # GET /connections/stripe/callback
 # ---------------------------------------------------------------------------
 

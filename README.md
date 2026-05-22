@@ -45,8 +45,10 @@ background sync, and a deployed pipeline across three cloud providers.
   synced ledger.
 - **Stripe Connect, end to end.** OAuth authorize → callback bound by a
   one-time CSRF state token → token exchange → background sync of
-  customers, subs, and charges, with a per-run audit log. Connected-account
-  tokens are **encrypted at rest** (Fernet); the API never returns them.
+  customers, subs, and charges, with a per-run audit log. Or connect with
+  a **read-only restricted key** (`rk_…`) — full secret keys are rejected.
+  Connected-account credentials are **encrypted at rest** (Fernet); the
+  API never returns them, and disconnecting cascade-deletes all synced data.
 - **An AI analyst, accounted for.** Every Anthropic call goes through a
   single wrapper with prompt caching and adaptive thinking, and writes a
   usage row (tokens, cache hits, **USD cost**) — even on failure.
@@ -171,6 +173,7 @@ Base path `/api/v1`; interactive docs at `/api/v1/docs` (Swagger).
 | --- | --- | --- |
 | POST | `/connections/stripe/connect` | Returns a Stripe authorize URL |
 | GET | `/connections/stripe/callback` | OAuth callback, bound by one-time state token |
+| POST | `/connections/stripe/api-key` | Connect with a read-only restricted key (`rk_…`) |
 | GET/DELETE | `/connections/{id}` | Inspect / disconnect a connected account |
 | POST | `/connections/{id}/sync` | Trigger a sync; returns a `sync_log_id` |
 | GET | `/connections/{id}/customers\|subscriptions\|charges` | Synced data |

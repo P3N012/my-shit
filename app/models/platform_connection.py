@@ -35,6 +35,12 @@ CONN_ACTIVE = "active"
 CONN_DISCONNECTED = "disconnected"
 CONN_ERROR = "error"
 
+# How the connection authenticates to the platform.
+#   oauth          — Stripe Connect OAuth (platform key + stripe_account).
+#   restricted_key — a read-only restricted API key the user pasted in.
+AUTH_OAUTH = "oauth"
+AUTH_RESTRICTED_KEY = "restricted_key"
+
 
 class PlatformConnection(Base):
     __tablename__ = "platform_connections"
@@ -59,8 +65,12 @@ class PlatformConnection(Base):
     account_name = Column(String, nullable=True)
     account_metadata = Column(JSON, nullable=True)
 
-    # OAuth tokens, encrypted at rest with Fernet via EncryptedString —
-    # the column holds ciphertext; the ORM hands application code plaintext.
+    # How this connection authenticates — see AUTH_* constants.
+    auth_method = Column(String, nullable=False, server_default=AUTH_OAUTH, default=AUTH_OAUTH)
+
+    # OAuth tokens / restricted API key, encrypted at rest with Fernet via
+    # EncryptedString — the column holds ciphertext; the ORM hands
+    # application code plaintext.
     access_token = Column(EncryptedString, nullable=False)
     refresh_token = Column(EncryptedString, nullable=True)
     token_expires_at = Column(DateTime(timezone=True), nullable=True)
