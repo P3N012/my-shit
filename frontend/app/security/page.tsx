@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  ArrowRight,
   CreditCard,
   Eye,
   Github,
@@ -20,6 +21,14 @@ export const metadata: Metadata = {
 
 const REPO = "https://github.com/P3N012/insightplus";
 
+const CHIPS = [
+  { icon: Eye, label: "Read-only" },
+  { icon: Lock, label: "Encrypted at rest" },
+  { icon: CreditCard, label: "No card data" },
+  { icon: Trash2, label: "Disconnect deletes all" },
+  { icon: Github, label: "Open source" },
+];
+
 const GUARANTEES = [
   {
     icon: Eye,
@@ -38,9 +47,9 @@ const GUARANTEES = [
     title: "You stay in control",
     body: (
       <>
-        You authorize inside Stripe — we never see your password. Revoke our access any time
-        from <strong className="text-ink">your</strong> Stripe dashboard, and you don&apos;t
-        need us to do it.
+        You authorize inside Stripe — we never see your password. Revoke access any time from{" "}
+        <strong className="text-ink">your</strong> Stripe dashboard; you don&apos;t need us to
+        do it.
       </>
     ),
   },
@@ -50,7 +59,7 @@ const GUARANTEES = [
     body: (
       <>
         Card numbers live with Stripe, a PCI-certified processor — they never reach our
-        servers. We only mirror metadata: amounts, statuses, plan names, and customer
+        servers. We mirror only metadata: amounts, statuses, plan names, and customer
         names/emails.
       </>
     ),
@@ -60,9 +69,9 @@ const GUARANTEES = [
     title: "Encrypted at rest",
     body: (
       <>
-        The credential for your connected account is <strong className="text-ink">encrypted
-        at rest</strong> (AES, via Fernet) in our database. Even our own API never returns it.
-        A leaked database row is useless without the key.
+        The credential for your connected account is{" "}
+        <strong className="text-ink">encrypted at rest</strong> (AES, via Fernet). Even our own
+        API never returns it — a leaked database row is useless without the key.
       </>
     ),
   },
@@ -72,7 +81,7 @@ const GUARANTEES = [
     body: (
       <>
         Disconnect an account and we <strong className="text-ink">cascade-delete</strong> all
-        of its synced customers, subscriptions, and charges from our database. No leftovers.
+        of its synced customers, subscriptions, and charges. No leftovers.
       </>
     ),
   },
@@ -90,24 +99,39 @@ const GUARANTEES = [
 
 export default function SecurityPage() {
   return (
-    <div className="min-h-screen bg-base text-mute">
+    <div className="relative min-h-screen overflow-hidden bg-base text-mute">
+      {/* Ambient glows so the page isn't a flat black slab. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-40 left-1/2 h-[36rem] w-[36rem] -translate-x-1/2 rounded-full opacity-25 blur-3xl"
+        style={{
+          background:
+            "radial-gradient(closest-side, rgba(255,107,53,0.45), transparent)",
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-48 -right-40 h-[34rem] w-[34rem] rounded-full opacity-20 blur-3xl"
+        style={{
+          background:
+            "radial-gradient(closest-side, rgba(255,134,89,0.4), transparent)",
+        }}
+      />
+
       {/* Top bar */}
-      <header className="flex items-center justify-between px-6 py-5 lg:px-12">
+      <header className="relative flex items-center justify-between px-6 py-5 lg:px-12">
         <Link
           href="/"
           className="text-ember font-heading text-lg font-bold tracking-tight"
         >
           InsightPlus
         </Link>
-        <Link
-          href="/login"
-          className="text-sm font-semibold text-mute hover:text-ink"
-        >
+        <Link href="/login" className="text-sm font-semibold text-mute hover:text-ink">
           Sign in
         </Link>
       </header>
 
-      <main className="mx-auto max-w-3xl px-6 pb-24 pt-8 lg:pt-16">
+      <main className="relative mx-auto max-w-4xl px-6 pb-24">
         <Link
           href="/login"
           className="inline-flex items-center gap-2 text-sm font-semibold text-mute hover:text-ink"
@@ -116,88 +140,106 @@ export default function SecurityPage() {
           Back
         </Link>
 
-        <div className="mt-8 flex items-center gap-3">
-          <span className="flex h-11 w-11 flex-none items-center justify-center rounded-lg bg-accent/15">
-            <ShieldCheck className="h-6 w-6 text-accent" />
+        {/* Hero */}
+        <section className="mx-auto mt-10 max-w-2xl text-center lg:mt-14">
+          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/15">
+            <ShieldCheck className="h-7 w-7 text-accent" />
           </span>
-          <h1 className="font-heading text-3xl font-bold tracking-tight text-ink lg:text-4xl">
-            Security &amp; trust
+          <h1 className="mt-6 font-heading text-4xl font-bold tracking-tight text-ink lg:text-5xl">
+            Your revenue data, <span className="text-ember">handled with care</span>
           </h1>
-        </div>
+          <p className="mt-5 text-base leading-relaxed lg:text-lg">
+            Connecting financial data to a product you don&apos;t know is a big ask. So
+            here&apos;s exactly how InsightPlus handles it — in plain English, nothing hidden.
+          </p>
 
-        <p className="mt-5 text-base leading-relaxed">
-          Connecting your revenue data to a product you don&apos;t know is a big ask. So
-          here&apos;s exactly how InsightPlus handles it — in plain English, with nothing
-          hidden. InsightPlus is an independent product, not a large company; the difference is
-          that the entire codebase is open, so you can verify every claim on this page yourself.
-        </p>
+          {/* Quick-scan chips */}
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-2.5">
+            {CHIPS.map(({ icon: Icon, label }) => (
+              <span
+                key={label}
+                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-panel px-3 py-1.5 text-xs font-semibold text-mute"
+              >
+                <Icon className="h-3.5 w-3.5 text-accent" />
+                {label}
+              </span>
+            ))}
+          </div>
+        </section>
 
         {/* Guarantees */}
-        <div className="mt-10 grid gap-4 sm:grid-cols-2">
+        <section className="mt-14 grid gap-4 sm:grid-cols-2">
           {GUARANTEES.map(({ icon: Icon, title, body }) => (
             <div
               key={title}
-              className="rounded-lg border border-line bg-panel p-5"
+              className="rounded-xl border border-line bg-panel p-6 transition-colors hover:border-accent/30"
             >
-              <div className="flex items-center gap-2.5">
-                <Icon className="h-5 w-5 flex-none text-accent" />
-                <h2 className="font-heading text-base font-semibold text-ink">
-                  {title}
-                </h2>
-              </div>
-              <p className="mt-3 text-sm leading-relaxed">{body}</p>
+              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/15">
+                <Icon className="h-5 w-5 text-accent" />
+              </span>
+              <h2 className="mt-4 font-heading text-lg font-semibold text-ink">
+                {title}
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed">{body}</p>
             </div>
           ))}
-        </div>
+        </section>
 
         {/* Open source */}
-        <div className="stripe-ember mt-10 overflow-hidden rounded-lg border border-line bg-panel p-6">
+        <section className="stripe-ember relative mt-6 overflow-hidden rounded-xl border border-line bg-panel p-7">
           <div className="flex items-center gap-2.5">
             <Github className="h-5 w-5 text-accent" />
-            <h2 className="font-heading text-lg font-semibold text-ink">
+            <h2 className="font-heading text-xl font-semibold text-ink">
               Don&apos;t take our word for it
             </h2>
           </div>
-          <p className="mt-3 text-sm leading-relaxed">
-            The entire codebase is public. You can read the exact code that touches your data:
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed">
+            The entire codebase is public. Read the exact code that touches your data — no
+            marketing claims, just the source:
           </p>
-          <ul className="mt-4 space-y-2 text-sm">
-            <li>
-              <a
-                className="font-semibold text-accent hover:underline"
-                href={`${REPO}/blob/main/app/core/crypto.py`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                app/core/crypto.py
-              </a>{" "}
-              — how credentials are encrypted at rest
-            </li>
-            <li>
-              <a
-                className="font-semibold text-accent hover:underline"
-                href={`${REPO}/blob/main/app/services/stripe_apikey_service.py`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                app/services/stripe_apikey_service.py
-              </a>{" "}
-              — read-only key handling (and why secret keys are rejected)
-            </li>
-          </ul>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <SourceLink
+              href={`${REPO}/blob/main/app/core/crypto.py`}
+              path="app/core/crypto.py"
+              note="How credentials are encrypted at rest"
+            />
+            <SourceLink
+              href={`${REPO}/blob/main/app/services/stripe_apikey_service.py`}
+              path="app/services/stripe_apikey_service.py"
+              note="Read-only key handling; secret keys rejected"
+            />
+          </div>
           <a
-            className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-ink hover:text-accent"
+            className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-ink hover:text-accent"
             href={REPO}
             target="_blank"
             rel="noreferrer"
           >
             <Github className="h-4 w-4" />
             View the full repository
+            <ArrowRight className="h-4 w-4" />
           </a>
-        </div>
+        </section>
 
-        {/* Contact */}
-        <div className="mt-10 border-t border-line pt-6 text-sm">
+        {/* CTA */}
+        <section className="mt-6 rounded-xl border border-line bg-panel p-8 text-center">
+          <h2 className="font-heading text-xl font-semibold text-ink">
+            See it before you trust it
+          </h2>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed">
+            Explore a fully populated demo account — no signup, no connection, nothing to lose.
+          </p>
+          <Link
+            href="/login"
+            className="mt-5 inline-flex items-center gap-2 rounded-md bg-accent px-5 py-2.5 text-sm font-semibold text-accent-fg transition-opacity hover:opacity-90"
+          >
+            <Sparkles className="h-4 w-4" />
+            Try the live demo
+          </Link>
+        </section>
+
+        {/* Contact / footer */}
+        <footer className="mt-10 border-t border-line pt-6 text-sm">
           <p>
             Built by{" "}
             <a
@@ -217,8 +259,32 @@ export default function SecurityPage() {
             </a>
             .
           </p>
-        </div>
+        </footer>
       </main>
     </div>
+  );
+}
+
+function SourceLink({
+  href,
+  path,
+  note,
+}: {
+  href: string;
+  path: string;
+  note: string;
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="group rounded-lg border border-line bg-base p-4 transition-colors hover:border-accent/40"
+    >
+      <div className="font-heading text-sm font-semibold text-accent group-hover:underline">
+        {path}
+      </div>
+      <div className="mt-1 text-xs text-fade">{note}</div>
+    </a>
   );
 }
