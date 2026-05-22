@@ -509,3 +509,85 @@ def test_activity_feed_skips_events_outside_window(client, auth_tokens, org_id, 
         headers=_full_headers(auth_tokens, org_id),
     )
     assert r.json()["events"] == []
+
+
+# ---------------------------------------------------------------------------
+# Customer detail
+# ---------------------------------------------------------------------------
+
+def test_customer_detail_returns_full_record(client, auth_tokens, org_id, db_session):
+    conn = _make_connection(db_session, org_id)
+    now = datetime.now(timezone.utc)
+
+    db_session.add(StripeCustomer(
+        connection_id=conn.id,
+        stripe_customer_id="cus_detail",
+        name="Detail Co",
+        email="ops@detail.test",
+        currency="usd",
+        delinquent=False,
+        stripe_created_at=now - timedelta(days=120),
+    ))
+    db_session.add(StripeSubscription(
+        connection_id=conn.id,
+        stripe_subscription_id="sub_d",
+        stripe_customer_id="cus_detail",
+        status="active",
+        currency="usd",
+        amount_per_period=9900,
+        interval="month",
+        interval_count=1,
+        started_at=now - timedelta(days=120),
+        stripe_created_at=now - timedelta(days=120),
+    ))
+    # Two succeeded charges + one failed (failed excluded from LTV).
+    for i, (amt, status) in enumerate([(9900, "succeeded"), (9900, "succeeded"), (9900, "failed")]):
+        db_session.add(StripeCharge(
+            connection_id=conn.id,
+            stripe_charge_id=f"ch_d_{i}",
+            stripe_customer_id="cus_detail",
+            amount=amt,
+            currency="usd",
+            status=status,
+            paid=status == "succeeded",
+            stripe_created_at=now - timedelta(days=i * 30),
+        ))
+    db_session.commit()
+
+    r = client.get(
+        "/api/v1/dashboard/customers/cus_detail",
+        headers=_full_headers(auth_tokens, org_id),
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["name"] == "Detail Co"
+    assert body["current_mrr_cents"] == 9900
+    assert body["lifetime_value_cents"] == 9900 * 2  # failed charge excluded
+    assert len(body["subscriptions"]) == 1
+    assert len(body["charges"]) == 3
+
+
+def test_customer_detail_404_for_unknown(client, auth_tokens, org_id):
+    r = client.get(
+        "/api/v1/dashboard/customers/cus_nope",
+        headers=_full_headers(auth_tokens, org_id),
+    )
+    assert r.status_code == 404
+
+
+def test_customer_detail_404_cross_org(client, auth_tokens, org_id, db_session):
+    foreign = _make_connection(db_session, org_id=99999)
+    db_session.add(StripeCustomer(
+        connection_id=foreign.id,
+        stripe_customer_id="cus_foreign",
+        name="Foreign Co",
+        currency="usd",
+        stripe_created_at=datetime.now(timezone.utc),
+    ))
+    db_session.commit()
+
+    r = client.get(
+        "/api/v1/dashboard/customers/cus_foreign",
+        headers=_full_headers(auth_tokens, org_id),
+    )
+    assert r.status_code == 404

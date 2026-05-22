@@ -221,3 +221,44 @@ export interface AIReview {
   metrics_snapshot: Record<string, unknown> | null;
   created_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Customer detail
+// ---------------------------------------------------------------------------
+
+export interface CustomerSubscriptionDetail {
+  stripe_subscription_id: string;
+  status: string;
+  currency: string | null;
+  amount_per_period: number;
+  interval: string | null;
+  interval_count: number;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  canceled_at: string | null;
+  started_at: string | null;
+}
+
+export interface CustomerChargeDetail {
+  stripe_charge_id: string;
+  amount: number;
+  amount_refunded: number;
+  currency: string;
+  status: string;
+  paid: boolean;
+  refunded: boolean;
+  stripe_created_at: string;
+}
+
+export interface CustomerDetail {
+  stripe_customer_id: string;
+  name: string | null;
+  email: string | null;
+  currency: string | null;
+  delinquent: boolean;
+  stripe_created_at: string;
+  current_mrr_cents: number;
+  lifetime_value_cents: number;
+  subscriptions: CustomerSubscriptionDetail[];
+  charges: CustomerChargeDetail[];
+}

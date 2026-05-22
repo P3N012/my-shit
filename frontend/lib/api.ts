@@ -16,6 +16,7 @@ import type {
   ChargeSummary,
   Connection,
   ConnectionListResponse,
+  CustomerDetail,
   DashboardActivity,
   DashboardMovements,
   DashboardOverview,
@@ -249,6 +250,11 @@ export const api = {
 
   dashboardActivity: (limit = 15, days = 30) =>
     request<DashboardActivity>(`/dashboard/activity?limit=${limit}&days=${days}`),
+
+  dashboardCustomerDetail: (stripeCustomerId: string) =>
+    request<CustomerDetail>(
+      `/dashboard/customers/${encodeURIComponent(stripeCustomerId)}`
+    ),
 
   // ---------------------------------------------------------------------------
   // AI weekly review

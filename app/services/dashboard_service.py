@@ -122,6 +122,20 @@ class ActivityEvent:
     description: str
 
 
+@dataclass
+class CustomerDetail:
+    stripe_customer_id: str
+    name: Optional[str]
+    email: Optional[str]
+    currency: Optional[str]
+    delinquent: bool
+    stripe_created_at: datetime
+    current_mrr_cents: int
+    lifetime_value_cents: int   # sum of succeeded charges, all time
+    subscriptions: List[StripeSubscription]
+    charges: List[StripeCharge]
+
+
 # ---------------------------------------------------------------------------
 # Service
 # ---------------------------------------------------------------------------
@@ -633,3 +647,77 @@ class DashboardService:
             "top_new_customers": [describe(s) for s in new_subs_sorted],
             "top_churned_customers": [describe(s) for s in churned_subs_sorted],
         }
+
+    @staticmethod
+    def customer_detail(
+        db: Session, organization_id: int, stripe_customer_id: str
+    ) -> Optional[CustomerDetail]:
+        """Full drill-down for one customer, scoped to the org.
+
+        Finds the customer within any of the org's connections (takes the
+        first match), then pulls every subscription and charge for that
+        customer under the *same* connection. Returns None if the customer
+        isn't found in this org — the route turns that into a 404.
+        """
+        connection_ids = DashboardService._connection_ids(db, organization_id)
+        if not connection_ids:
+            return None
+
+        customer = (
+            db.query(StripeCustomer)
+            .filter(
+                StripeCustomer.connection_id.in_(connection_ids),
+                StripeCustomer.stripe_customer_id == stripe_customer_id,
+            )
+            .first()
+        )
+        if customer is None:
+            return None
+
+        # Scope the rest to the connection this customer belongs to, so a
+        # same-named Stripe customer ID under a different connection can't
+        # bleed in.
+        cid = customer.connection_id
+
+        subscriptions = (
+            db.query(StripeSubscription)
+            .filter(
+                StripeSubscription.connection_id == cid,
+                StripeSubscription.stripe_customer_id == stripe_customer_id,
+            )
+            .order_by(StripeSubscription.stripe_created_at.desc())
+            .all()
+        )
+        charges = (
+            db.query(StripeCharge)
+            .filter(
+                StripeCharge.connection_id == cid,
+                StripeCharge.stripe_customer_id == stripe_customer_id,
+            )
+            .order_by(StripeCharge.stripe_created_at.desc())
+            .limit(100)
+            .all()
+        )
+
+        current_mrr = sum(
+            normalize_to_monthly_cents(s.amount_per_period, s.interval, s.interval_count)
+            for s in subscriptions
+            if s.status in ("active", "trialing", "past_due")
+            and (s.canceled_at is None)
+        )
+        lifetime_value = sum(
+            c.amount for c in charges if c.status == "succeeded"
+        )
+
+        return CustomerDetail(
+            stripe_customer_id=customer.stripe_customer_id,
+            name=customer.name,
+            email=customer.email,
+            currency=customer.currency,
+            delinquent=customer.delinquent,
+            stripe_created_at=customer.stripe_created_at,
+            current_mrr_cents=current_mrr,
+            lifetime_value_cents=int(lifetime_value),
+            subscriptions=subscriptions,
+            charges=charges,
+        )

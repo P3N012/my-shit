@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Sparkles } from "lucide-react";
+import Link from "next/link";
 
 import { ActivityFeed } from "@/components/activity-feed";
 import { KpiCard } from "@/components/kpi-card";
@@ -11,7 +12,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/api";
 import { formatMoney, timeAgo } from "@/lib/format";
-import type { DashboardOverview, DashboardTopCustomer } from "@/lib/types";
+import type {
+  DashboardMovementPoint,
+  DashboardOverview,
+  DashboardTopCustomer,
+} from "@/lib/types";
 
 export default function DashboardPage() {
   const overview = useQuery({
@@ -102,11 +107,14 @@ export default function DashboardPage() {
       </Card>
 
       <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>MRR movements</CardTitle>
-          <span className="font-heading text-xs text-fade">
-            new vs churn per month
-          </span>
+        <CardHeader className="flex flex-row items-start justify-between gap-3">
+          <div className="flex flex-col gap-1.5">
+            <CardTitle>MRR movements</CardTitle>
+            <span className="font-heading text-xs text-fade">
+              new vs churn per month
+            </span>
+          </div>
+          <QuickRatio points={movements.data?.points ?? []} />
         </CardHeader>
         <CardContent>
           {movements.isLoading ? (
@@ -252,12 +260,18 @@ function TopCustomersCard({
             </thead>
             <tbody>
               {rows.map((c) => (
-                <tr key={c.stripe_customer_id} className="border-b border-line/60 last:border-0">
+                <tr
+                  key={c.stripe_customer_id}
+                  className="group border-b border-line/60 last:border-0"
+                >
                   <td className="py-4 text-ink">
-                    <div className="font-semibold">{c.name ?? c.stripe_customer_id}</div>
-                    {c.email && (
-                      <div className="text-xs text-fade">{c.email}</div>
-                    )}
+                    <Link
+                      href={`/customers/${encodeURIComponent(c.stripe_customer_id)}`}
+                      className="font-semibold group-hover:text-accent"
+                    >
+                      {c.name ?? c.stripe_customer_id}
+                    </Link>
+                    {c.email && <div className="text-xs text-fade">{c.email}</div>}
                   </td>
                   <td className="py-4 text-right font-heading font-bold text-ink">
                     {formatMoney(c.total_revenue_cents)}
@@ -284,6 +298,41 @@ function kpiDelta(d: DashboardOverview["mrr_delta"] | undefined) {
 
 function formatChurn(rate: number): string {
   return `${(rate * 100).toFixed(1)}%`;
+}
+
+// Quick ratio = total new MRR / total churned MRR over the visible
+// window. >1 means you're adding more than you're losing. >4 is
+// considered healthy SaaS growth; <1 means you're shrinking.
+function QuickRatio({ points }: { points: DashboardMovementPoint[] }) {
+  const totalNew = points.reduce((s, p) => s + p.new_mrr_cents, 0);
+  const totalChurn = points.reduce((s, p) => s + p.churn_mrr_cents, 0);
+
+  let display: string;
+  let healthy: boolean;
+  if (totalChurn === 0) {
+    display = totalNew > 0 ? "∞" : "—";
+    healthy = totalNew > 0;
+  } else {
+    const ratio = totalNew / totalChurn;
+    display = `${ratio.toFixed(1)}×`;
+    healthy = ratio >= 1;
+  }
+
+  return (
+    <div className="text-right">
+      <div className="font-heading text-[10px] font-bold uppercase tracking-wide text-fade">
+        Quick ratio
+      </div>
+      <div
+        className={`font-heading text-2xl font-bold ${
+          healthy ? "text-accent" : "text-mute"
+        }`}
+        title="Total new MRR ÷ total churned MRR over the last 12 months"
+      >
+        {display}
+      </div>
+    </div>
+  );
 }
 
 function ChartPlaceholder({ text }: { text: string }) {
