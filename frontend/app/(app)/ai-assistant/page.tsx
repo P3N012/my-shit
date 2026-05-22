@@ -59,7 +59,7 @@ export default function AiAssistantPage() {
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="border-b border-line px-10 py-6">
+      <header className="border-b border-line px-5 py-5 lg:px-10 lg:py-6">
         <h1 className="font-heading text-2xl font-semibold tracking-tight text-ink">
           AI Assistant
         </h1>
@@ -68,7 +68,7 @@ export default function AiAssistantPage() {
         </p>
       </header>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-10 py-8">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6 lg:px-10 lg:py-8">
         <div className="mx-auto max-w-3xl space-y-6">
           {messages.length === 0 && !sendMessage.isPending && (
             <EmptyState onPick={send} />
@@ -90,7 +90,7 @@ export default function AiAssistantPage() {
         </div>
       </div>
 
-      <form onSubmit={onSubmit} className="border-t border-line bg-panel px-10 py-5">
+      <form onSubmit={onSubmit} className="border-t border-line bg-panel px-5 py-4 lg:px-10 lg:py-5">
         <div className="mx-auto flex max-w-3xl items-end gap-3">
           <textarea
             value={draft}

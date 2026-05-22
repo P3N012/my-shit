@@ -24,7 +24,14 @@ const NAV = [
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
-export function Sidebar() {
+interface SidebarProps {
+  /** Whether the mobile drawer is open. Ignored on lg+ where the sidebar is always shown. */
+  mobileOpen?: boolean;
+  /** Called when the drawer should close (backdrop click or nav). */
+  onClose?: () => void;
+}
+
+export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, activeOrg, setActiveOrgId, logout } = useAuth();
   const [orgMenuOpen, setOrgMenuOpen] = useState(false);
@@ -36,7 +43,24 @@ export function Sidebar() {
   }, [user]);
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-line bg-panel">
+    <>
+      {/* Backdrop — mobile only, only when the drawer is open. Tap to close. */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/60 lg:hidden"
+          onClick={onClose}
+          aria-hidden
+        />
+      )}
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-line bg-panel",
+          "transition-transform duration-200 ease-out",
+          // Always on-screen at lg+. On mobile, slide in/out.
+          "lg:translate-x-0",
+          mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        )}
+      >
       <div className="flex flex-col gap-1 px-6 pt-7 pb-5">
         <span className="text-ember font-heading text-xl font-bold tracking-tight">
           InsightPlus
@@ -96,6 +120,7 @@ export function Sidebar() {
             <Link
               key={href}
               href={href}
+              onClick={onClose}
               className={cn(
                 "mb-1 flex items-center gap-3 rounded-md py-2.5 pl-3 pr-3 text-sm font-semibold transition-colors",
                 // Active items get a 3px accent strip on the left and a
@@ -137,6 +162,7 @@ export function Sidebar() {
           <span>Sign out</span>
         </Button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
