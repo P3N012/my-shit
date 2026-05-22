@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, description="Access token expiry in minutes")
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=30, description="Refresh token expiry in days")
     ALGORITHM: str = Field(default="HS256", description="JWT algorithm")
+
+    # Encryption at rest for stored OAuth tokens. Fernet key (urlsafe
+    # base64, 32 bytes). If blank, a key is derived from ACCESS_TOKEN_SECRET.
+    TOKEN_ENCRYPTION_KEY: str = Field(default="", description="Fernet key for encrypting connected-account OAuth tokens at rest. Generate with Fernet.generate_key(). Falls back to a key derived from ACCESS_TOKEN_SECRET when empty.")
     
     # Application
     ENVIRONMENT: str = Field(default="development", description="Environment: development, staging, production")

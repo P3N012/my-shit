@@ -19,6 +19,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
+from app.core.crypto import EncryptedString
 from app.core.database import Base
 
 
@@ -58,10 +59,10 @@ class PlatformConnection(Base):
     account_name = Column(String, nullable=True)
     account_metadata = Column(JSON, nullable=True)
 
-    # OAuth tokens. Stored as plaintext for an MVP — a real production
-    # deployment would encrypt these at rest with a KMS-managed key.
-    access_token = Column(String, nullable=False)
-    refresh_token = Column(String, nullable=True)
+    # OAuth tokens, encrypted at rest with Fernet via EncryptedString —
+    # the column holds ciphertext; the ORM hands application code plaintext.
+    access_token = Column(EncryptedString, nullable=False)
+    refresh_token = Column(EncryptedString, nullable=True)
     token_expires_at = Column(DateTime(timezone=True), nullable=True)
     scope = Column(String, nullable=True)
 
