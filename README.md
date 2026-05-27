@@ -1,5 +1,14 @@
 # InsightPlus
 
+AI-powered revenue and customer intelligence for businesses on Stripe.
+Two halves of one repo:
+
+- **Backend** (this directory) — FastAPI + Postgres + arq + Anthropic.
+  Auth, multi-tenancy, Stripe Connect, sync, AI calls + usage tracking.
+- **Frontend** (`frontend/`) — Next.js 14 + Tailwind, "Ember Glow"
+  dark theme. Talks to the backend over `/api/v1/*`.
+
+See `frontend/README.md` for the frontend's own walkthrough.
 **AI-powered revenue & customer intelligence for SaaS businesses on Stripe.**
 Think Baremetrics meets a Claude analyst — your MRR, churn, and customer
 movements on one page, with an AI-written weekly review that tells you
@@ -124,6 +133,58 @@ python scripts/seed_demo_data.py                  # ~160 synthetic customers (no
 python main.py                                     # http://localhost:8000  · docs at /api/v1/docs
 ```
 
+---
+
+## API
+
+Base path: `/api/v1`
+
+### Authentication (`/auth`)
+
+| Method | Path             | Description                                                          |
+| ------ | ---------------- | -------------------------------------------------------------------- |
+| POST   | `/auth/register` | Create an account (auto-provisions a personal organization)          |
+| POST   | `/auth/login`    | Exchange credentials for an access + refresh token pair              |
+| POST   | `/auth/refresh`  | **Rotates** the refresh token; returns a new access + refresh pair   |
+| POST   | `/auth/logout`   | Revoke a refresh token                                               |
+| GET    | `/auth/me`       | Current user + memberships (requires `Authorization: Bearer <token>`) |
+
+### Organizations (`/orgs`)
+
+| Method | Path           | Description                                                       |
+| ------ | -------------- | ----------------------------------------------------------------- |
+| GET    | `/orgs`        | List orgs the current user belongs to                             |
+| POST   | `/orgs`        | Create a new org (caller becomes `owner`)                         |
+| GET    | `/orgs/{id}`   | Get a specific org (403 if the user has no membership)            |
+
+### Connections (`/connections`) — org-scoped (except the callback)
+
+Stripe Connect OAuth and connected-data-source management.
+
+| Method | Path                              | Description                                                                |
+| ------ | --------------------------------- | -------------------------------------------------------------------------- |
+| POST   | `/connections/stripe/connect`     | Returns a Stripe authorization URL; client navigates the user there.       |
+| GET    | `/connections/stripe/callback`    | Stripe redirects here; **public**, bound to user by one-time state token.  |
+| GET    | `/connections`                    | List the org's connected accounts (tokens never returned).                 |
+| GET    | `/connections/{id}`               | Get one connection.                                                        |
+| DELETE | `/connections/{id}`               | Disconnect: revoke at Stripe (best-effort) and remove the row.             |
+| POST   | `/connections/{id}/sync`          | Enqueue a Stripe sync via arq. Returns `sync_log_id` immediately.          |
+| GET    | `/connections/{id}/sync-logs`     | History of sync runs (newest first), with stats and any error.             |
+| GET    | `/connections/{id}/customers`     | Synced customers for this connection.                                      |
+| GET    | `/connections/{id}/subscriptions` | Synced subscriptions (filterable by `status`).                             |
+| GET    | `/connections/{id}/charges`       | Synced charges (last 90 days by default — sync window).                    |
+
+### Dashboard (`/dashboard`) — org-scoped
+
+| Method | Path                          | Description                                                          |
+| ------ | ----------------------------- | -------------------------------------------------------------------- |
+| GET    | `/dashboard/overview`         | Current MRR, ARR, active customer count, churn rate (+ 30d deltas).   |
+| GET    | `/dashboard/trends`           | 12 end-of-month MRR samples for the chart.                            |
+| GET    | `/dashboard/top-customers`    | Top N customers by revenue over the last 90 days.                     |
+| GET    | `/dashboard/movements`        | Per-month new vs. churned MRR movements for the chart.               |
+| GET    | `/dashboard/activity`         | Recent account activity feed (signups, payments, churn).            |
+
+### AI (`/ai`) — org-scoped, requires `X-Organization-Id` header
 **Frontend:**
 
 ```bash

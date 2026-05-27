@@ -1,7 +1,7 @@
 # InsightPlus — frontend
 
-Next.js 14 (App Router) + TypeScript + Tailwind. Ports the **"Monochrome
-Authority"** direction from the Claude Design handoff and wires it to
+Next.js 14 (App Router) + TypeScript + Tailwind. Ports the **"Ember Glow"**
+direction (Direction 5 from the Claude Design handoff) and wires it to
 the FastAPI backend.
 
 ## Stack
@@ -12,7 +12,8 @@ the FastAPI backend.
   (Radix Slot + class-variance-authority + Tailwind). No CLI install
   step — the components live in-tree.
 - **Data**: TanStack Query against `/api/v1/*`
-- **Fonts**: `next/font/google` → JetBrains Mono (heading) + IBM Plex Sans (body)
+- **Fonts**: `next/font/google` → Manrope, a single typeface used at
+  multiple weights for both display and body
 
 ## Run
 
@@ -46,7 +47,7 @@ frontend/
 │   ├── auth-context.tsx         token storage, /auth/me hydrate, login/logout
 │   ├── providers.tsx            TanStack Query + AuthProvider
 │   ├── sidebar.tsx              nav, org switcher, user dropdown
-│   ├── kpi-card.tsx, mrr-chart.tsx
+│   ├── kpi-card.tsx, mrr-chart.tsx, mrr-movements-chart.tsx, activity-feed.tsx
 │   └── ui/                      button, card, input, label, badge
 ├── lib/
 │   ├── api.ts                   single fetch wrapper with refresh-token rotation
@@ -54,22 +55,24 @@ frontend/
 │   ├── format.ts                money + relative-time
 │   ├── types.ts                 mirrors backend pydantic shapes
 │   └── utils.ts                 cn()
-└── tailwind.config.ts           Direction 1 design tokens
+└── tailwind.config.ts           Ember Glow design tokens
 ```
 
-## Design tokens (Direction 1 — Monochrome Authority)
+## Design tokens (Direction 5 — Ember Glow)
 
 | Token | Value | Use |
 |---|---|---|
-| `bg-base` | `#0a0a0a` | App background |
-| `bg-panel` | `#000000` | Cards, sidebar |
-| `border-line` | `#1a1a1a` | Hairlines |
+| `bg-base` | `#0f0f0f` | App background (warm near-black) |
+| `bg-panel` | `#1a1a1a` | Cards, sidebar |
+| `border-line` | `#2a2a2a` | Hairlines |
+| `bg-elev` | `#222222` | Elevated surfaces |
 | `text-ink` | `#ffffff` | Primary text |
-| `text-mute` | `#888` | Secondary |
-| `text-fade` | `#666` | Tertiary, captions |
-| `bg-accent` / `text-accent` | `oklch(0.65 0.24 142)` | Cyan-green highlight |
-| `font-heading` | JetBrains Mono | KPIs, headings, labels, badges |
-| `font-sans` | IBM Plex Sans | Body, table cells, prose |
+| `text-mute` | `#888888` | Secondary |
+| `text-fade` | `#666666` | Tertiary, captions |
+| `bg-accent` / `text-accent` | `#ff6b35` | Vibrant orange highlight |
+| `accent-muted` | `#ff8659` | Lighter companion for gradient fills |
+| `bg-ember-gradient` | orange → lighter orange | Gradient accent fills |
+| `font-sans` / `font-mono` | Manrope | All text — single typeface at multiple weights |
 
 ## What's wired vs. what's placeholder
 
