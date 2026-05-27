@@ -11,7 +11,10 @@ from unittest.mock import patch
 
 import pytest
 
+import stripe
+
 from app.models.platform_connection import (
+    AUTH_RESTRICTED_KEY,
     CONN_ACTIVE,
     CONN_ERROR,
     PLATFORM_STRIPE,
@@ -71,6 +74,36 @@ def stripe_secret_set():
         yield
     finally:
         config.settings.STRIPE_SECRET_KEY = saved
+
+
+# ---------------------------------------------------------------------------
+# Auth resolution per connection type
+# ---------------------------------------------------------------------------
+
+def test_configure_auth_oauth_uses_platform_key_and_account(db_session):
+    conn = _make_connection(db_session)  # default auth_method == "oauth"
+    kwargs = StripeSyncService._configure_auth(conn)
+    assert kwargs == {"stripe_account": "acct_sync_test"}
+    assert stripe.api_key == "sk_test_dummy"  # the platform secret
+
+
+def test_configure_auth_restricted_key_uses_key_directly(db_session):
+    conn = PlatformConnection(
+        organization_id=1,
+        platform=PLATFORM_STRIPE,
+        auth_method=AUTH_RESTRICTED_KEY,
+        account_id="acct_rk",
+        access_token="rk_test_readonly",
+        status=CONN_ACTIVE,
+    )
+    db_session.add(conn)
+    db_session.commit()
+    db_session.refresh(conn)
+
+    kwargs = StripeSyncService._configure_auth(conn)
+    # No stripe_account header — the key authenticates as the account.
+    assert kwargs == {}
+    assert stripe.api_key == "rk_test_readonly"
 
 
 # ---------------------------------------------------------------------------

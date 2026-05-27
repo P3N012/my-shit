@@ -8,6 +8,7 @@ and at-rest hashing of refresh tokens.
 import hashlib
 import time
 
+from app.core.config import settings
 from app.models.user import RefreshToken, User
 
 
@@ -118,6 +119,46 @@ def test_login_rejects_unknown_email(client):
         json={"email": "nobody@example.com", "password": "password123"},
     )
     assert r.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Demo login
+# ---------------------------------------------------------------------------
+
+def test_demo_login_returns_usable_tokens(client):
+    r = client.post("/api/v1/auth/demo")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["access_token"]
+    assert body["refresh_token"]
+
+    # The token should authenticate against /me and land in a demo account
+    # that already has a membership (its personal org).
+    me = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {body['access_token']}"},
+    )
+    assert me.status_code == 200
+    assert me.json()["email"] == settings.DEMO_USER_EMAIL
+    assert len(me.json()["memberships"]) >= 1
+
+
+def test_demo_login_is_idempotent(client, db_session):
+    client.post("/api/v1/auth/demo")
+    client.post("/api/v1/auth/demo")
+    # Repeated demo logins reuse the one shared account, never duplicate it.
+    count = (
+        db_session.query(User)
+        .filter(User.email == settings.DEMO_USER_EMAIL)
+        .count()
+    )
+    assert count == 1
+
+
+def test_demo_login_disabled_returns_404(client, monkeypatch):
+    monkeypatch.setattr(settings, "DEMO_LOGIN_ENABLED", False)
+    r = client.post("/api/v1/auth/demo")
+    assert r.status_code == 404
 
 
 # ---------------------------------------------------------------------------

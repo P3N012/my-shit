@@ -19,6 +19,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
+from app.core.crypto import EncryptedString
 from app.core.database import Base
 
 
@@ -33,6 +34,12 @@ PLATFORM_STRIPE = "stripe"
 CONN_ACTIVE = "active"
 CONN_DISCONNECTED = "disconnected"
 CONN_ERROR = "error"
+
+# How the connection authenticates to the platform.
+#   oauth          — Stripe Connect OAuth (platform key + stripe_account).
+#   restricted_key — a read-only restricted API key the user pasted in.
+AUTH_OAUTH = "oauth"
+AUTH_RESTRICTED_KEY = "restricted_key"
 
 
 class PlatformConnection(Base):
@@ -58,10 +65,14 @@ class PlatformConnection(Base):
     account_name = Column(String, nullable=True)
     account_metadata = Column(JSON, nullable=True)
 
-    # OAuth tokens. Stored as plaintext for an MVP — a real production
-    # deployment would encrypt these at rest with a KMS-managed key.
-    access_token = Column(String, nullable=False)
-    refresh_token = Column(String, nullable=True)
+    # How this connection authenticates — see AUTH_* constants.
+    auth_method = Column(String, nullable=False, server_default=AUTH_OAUTH, default=AUTH_OAUTH)
+
+    # OAuth tokens / restricted API key, encrypted at rest with Fernet via
+    # EncryptedString — the column holds ciphertext; the ORM hands
+    # application code plaintext.
+    access_token = Column(EncryptedString, nullable=False)
+    refresh_token = Column(EncryptedString, nullable=True)
     token_expires_at = Column(DateTime(timezone=True), nullable=True)
     scope = Column(String, nullable=True)
 

@@ -20,6 +20,7 @@ interface AuthContextValue {
   activeOrg: Membership | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginDemo: () => Promise<void>;
   register: (email: string, username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   setActiveOrgId: (orgId: number) => void;
@@ -63,9 +64,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const login = useCallback(
-    async (email: string, password: string) => {
-      const tokens = await api.login(email, password);
+  // Shared tail of every sign-in path: persist tokens, hydrate the user,
+  // select their first org, and land on the dashboard.
+  const completeLogin = useCallback(
+    async (tokens: { access_token: string; refresh_token: string }) => {
       tokenStorage.setTokens(tokens.access_token, tokens.refresh_token);
       const u = await api.me();
       setUser(u);
@@ -78,6 +80,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [router]
   );
+
+  const login = useCallback(
+    async (email: string, password: string) => {
+      await completeLogin(await api.login(email, password));
+    },
+    [completeLogin]
+  );
+
+  const loginDemo = useCallback(async () => {
+    await completeLogin(await api.demoLogin());
+  }, [completeLogin]);
 
   const register = useCallback(
     async (email: string, username: string, password: string) => {
@@ -115,8 +128,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, activeOrgId]);
 
   const value = useMemo(
-    () => ({ user, activeOrg, loading, login, register, logout, setActiveOrgId }),
-    [user, activeOrg, loading, login, register, logout, setActiveOrgId]
+    () => ({ user, activeOrg, loading, login, loginDemo, register, logout, setActiveOrgId }),
+    [user, activeOrg, loading, login, loginDemo, register, logout, setActiveOrgId]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

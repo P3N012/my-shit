@@ -10,6 +10,7 @@ class ConnectionResponse(BaseModel):
     """Public-safe view of a PlatformConnection — never includes tokens."""
     id: int
     platform: str
+    auth_method: str
     account_id: str
     account_name: Optional[str]
     account_metadata: Optional[Dict[str, Any]]
@@ -20,6 +21,11 @@ class ConnectionResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class StripeApiKeyConnectRequest(BaseModel):
+    """Body for `POST /connections/stripe/api-key` — a read-only restricted key."""
+    api_key: str
 
 
 class ConnectionListResponse(BaseModel):

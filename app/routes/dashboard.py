@@ -7,6 +7,11 @@ Dashboard aggregates. All org-scoped via `X-Organization-Id`.
   GET /dashboard/movements             12-month new vs. churned MRR movements
   GET /dashboard/activity              Recent customer/subscription/charge events
   GET /dashboard/customers/{id}        One customer's drill-down (subs, charges, MRR, LTV)
+  GET /dashboard/overview        MRR / ARR / active customers / churn (+ deltas)
+  GET /dashboard/trends          12-month MRR trend (end-of-month samples)
+  GET /dashboard/top-customers   Top N customers by revenue over the last 90 days
+  GET /dashboard/movements       Per-month new vs. churned MRR movements
+  GET /dashboard/activity        Recent account activity feed
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query

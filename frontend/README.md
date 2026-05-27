@@ -2,6 +2,7 @@
 
 Next.js 14 (App Router) + TypeScript + Tailwind. Ports the **"Ember Glow"**
 direction (Direction 5) from the Claude Design handoff and wires it to
+direction (Direction 5 from the Claude Design handoff) and wires it to
 the FastAPI backend.
 
 ## Stack
@@ -13,6 +14,8 @@ the FastAPI backend.
   step — the components live in-tree.
 - **Data**: TanStack Query against `/api/v1/*`
 - **Fonts**: `next/font/google` → Manrope (single typeface; `.font-heading` is Manrope at weight 700)
+- **Fonts**: `next/font/google` → Manrope, a single typeface used at
+  multiple weights for both display and body
 
 ## Run
 
@@ -49,6 +52,7 @@ frontend/
 │   ├── sidebar.tsx              nav, org switcher, user dropdown
 │   ├── kpi-card.tsx, mrr-chart.tsx
 │   ├── mrr-movements-chart.tsx, activity-feed.tsx
+│   ├── kpi-card.tsx, mrr-chart.tsx, mrr-movements-chart.tsx, activity-feed.tsx
 │   └── ui/                      button, card, input, label, badge
 ├── lib/
 │   ├── api.ts                   single fetch wrapper with refresh-token rotation
@@ -60,6 +64,7 @@ frontend/
 ```
 
 ## Design tokens (Ember Glow — Direction 5)
+## Design tokens (Direction 5 — Ember Glow)
 
 | Token | Value | Use |
 |---|---|---|
@@ -67,6 +72,8 @@ frontend/
 | `bg-panel` | `#1a1a1a` | Cards, sidebar |
 | `bg-elev` | `#222222` | Elevated surfaces |
 | `border-line` | `#2a2a2a` | Hairlines |
+| `border-line` | `#2a2a2a` | Hairlines |
+| `bg-elev` | `#222222` | Elevated surfaces |
 | `text-ink` | `#ffffff` | Primary text |
 | `text-mute` | `#888888` | Secondary |
 | `text-fade` | `#666666` | Tertiary, captions |
@@ -74,6 +81,8 @@ frontend/
 | `accent-muted` | `#ff8659` | Lighter companion for gradient fills |
 | `stripe` | `#635bff` | Stripe brand purple |
 | `font-sans` / `font-heading` | Manrope | Single typeface; `font-heading` is weight 700 |
+| `bg-ember-gradient` | orange → lighter orange | Gradient accent fills |
+| `font-sans` / `font-mono` | Manrope | All text — single typeface at multiple weights |
 
 ## What's wired vs. what's placeholder
 
@@ -90,6 +99,7 @@ frontend/
 | Dashboard KPIs + MRR chart + top customers | `GET /dashboard/overview`, `/trends`, `/top-customers` — computed in Python from the mirrored Stripe tables. |
 | MRR movements + activity feed | `GET /dashboard/movements`, `/dashboard/activity`. The quick-ratio header on the movements card is derived client-side from the movements data (new MRR / churned MRR over the trailing 12 months). |
 | Customer drill-down | `GET /dashboard/customers/{id}` — `/customers/[id]` route with KPI cards (current MRR, LTV, active subs), subscriptions table, and charges table. Linked from Top Customers rows. |
+| MRR movements chart + activity feed | `GET /dashboard/movements`, `/dashboard/activity` — per-month new vs. churned MRR and a recent-events feed. |
 | AI weekly review card | `GET /ai/reviews/latest` + `POST /ai/reviews/generate` — Claude reads the past 7 days of aggregates and writes a 3-paragraph commentary. |
 
 ## Auth model on the client

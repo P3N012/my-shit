@@ -14,6 +14,8 @@ python-jose[cryptography]==3.3.0
 # bcrypt 4.x — pin to 3.x until passlib releases 1.8.
 passlib[bcrypt]==1.7.4
 bcrypt<4.0.0
+# Fernet symmetric encryption for OAuth tokens at rest (app/core/crypto.py).
+cryptography==48.0.0
 python-dotenv==1.0.1
 
 # Rate limiting

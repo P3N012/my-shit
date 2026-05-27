@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, Sparkles } from "lucide-react";
+import { Check, CreditCard, Eye, Lock, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
 
@@ -18,12 +19,13 @@ const FEATURES = [
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, loading, login, register } = useAuth();
+  const { user, loading, login, loginDemo, register } = useAuth();
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,6 +52,24 @@ export default function LoginPage() {
       setError(message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const onDemo = async () => {
+    setError(null);
+    setDemoLoading(true);
+    try {
+      await loginDemo();
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.detail
+          : err instanceof Error
+            ? err.message
+            : "Couldn't start the demo";
+      setError(message);
+    } finally {
+      setDemoLoading(false);
     }
   };
 
@@ -127,6 +147,26 @@ export default function LoginPage() {
             </Button>
           </form>
 
+          <div className="my-6 flex items-center gap-3">
+            <span className="h-px flex-1 bg-line" />
+            <span className="text-xs uppercase tracking-wide text-fade">or</span>
+            <span className="h-px flex-1 bg-line" />
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 w-full text-sm"
+            onClick={onDemo}
+            disabled={demoLoading || submitting}
+          >
+            <Sparkles className="h-4 w-4 text-accent" />
+            {demoLoading ? "Loading demo…" : "Try the live demo"}
+          </Button>
+          <p className="mt-2 text-center text-xs text-fade">
+            Explore a fully populated account — no signup required.
+          </p>
+
           <div className="mt-6 text-center text-sm text-mute">
             {isRegister ? "Already have an account? " : "Don't have an account? "}
             <button
@@ -139,6 +179,28 @@ export default function LoginPage() {
             >
               {isRegister ? "Sign in" : "Sign up"}
             </button>
+          </div>
+
+          <div className="mt-8 border-t border-line pt-5">
+            <div className="flex items-center justify-center gap-4 text-[11px] text-fade">
+              <span className="inline-flex items-center gap-1.5">
+                <Lock className="h-3 w-3" /> Encrypted
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Eye className="h-3 w-3" /> Read-only
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <CreditCard className="h-3 w-3" /> No card data
+              </span>
+            </div>
+            <div className="mt-3 text-center">
+              <Link
+                href="/security"
+                className="text-xs font-semibold text-mute hover:text-accent"
+              >
+                How we handle your data →
+              </Link>
+            </div>
           </div>
         </div>
       </div>

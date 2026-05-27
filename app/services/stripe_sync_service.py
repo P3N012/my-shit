@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.platform_connection import (
+    AUTH_RESTRICTED_KEY,
     CONN_ACTIVE,
     CONN_ERROR,
     PlatformConnection,
@@ -89,6 +90,25 @@ def _extract_interval(sub: Any) -> tuple[Optional[str], int]:
 
 class StripeSyncService:
     @staticmethod
+    def _configure_auth(connection: PlatformConnection) -> Dict[str, Any]:
+        """
+        Set `stripe.api_key` for this connection and return the extra
+        kwargs every Stripe call needs.
+
+        - restricted_key: authenticate *as* the account with its read-only
+          key — no `stripe_account` header.
+        - oauth (Connect): authenticate with the platform secret key and
+          target the connected account via `stripe_account`.
+        """
+        if connection.auth_method == AUTH_RESTRICTED_KEY:
+            stripe.api_key = connection.access_token
+            return {}
+        if not settings.STRIPE_SECRET_KEY:
+            raise RuntimeError("STRIPE_SECRET_KEY is not configured.")
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        return {"stripe_account": connection.account_id}
+
+    @staticmethod
     def sync(db: Session, connection: PlatformConnection) -> SyncLog:
         """
         Sync one connected Stripe account. Creates one SyncLog row, runs
@@ -97,27 +117,26 @@ class StripeSyncService:
         Raises on Stripe API failure; the calling worker translates that
         into a failed SyncLog + connection.status='error'.
         """
-        if not settings.STRIPE_SECRET_KEY:
-            raise RuntimeError("STRIPE_SECRET_KEY is not configured.")
+        # Set the API key + per-call kwargs for this connection's auth
+        # method before doing anything that touches Stripe.
+        call_kwargs = StripeSyncService._configure_auth(connection)
 
         log = SyncLog(connection_id=connection.id, status=SYNC_RUNNING)
         db.add(log)
         db.commit()
         db.refresh(log)
 
-        stripe.api_key = settings.STRIPE_SECRET_KEY
-        account_id = connection.account_id
         stats: Dict[str, int] = {"customers": 0, "subscriptions": 0, "charges": 0}
 
         try:
             for cust in stripe.Customer.list(
-                limit=100, stripe_account=account_id
+                limit=100, **call_kwargs
             ).auto_paging_iter():
                 StripeSyncService._upsert_customer(db, connection, cust)
                 stats["customers"] += 1
 
             for sub in stripe.Subscription.list(
-                status="all", limit=100, stripe_account=account_id
+                status="all", limit=100, **call_kwargs
             ).auto_paging_iter():
                 StripeSyncService._upsert_subscription(db, connection, sub)
                 stats["subscriptions"] += 1
@@ -128,7 +147,7 @@ class StripeSyncService:
             for charge in stripe.Charge.list(
                 created={"gte": cutoff},
                 limit=100,
-                stripe_account=account_id,
+                **call_kwargs,
             ).auto_paging_iter():
                 StripeSyncService._upsert_charge(db, connection, charge)
                 stats["charges"] += 1
