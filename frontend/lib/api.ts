@@ -16,6 +16,7 @@ import type {
   ChargeSummary,
   Connection,
   ConnectionListResponse,
+  CustomerDetail,
   DashboardActivity,
   DashboardMovements,
   DashboardOverview,
@@ -168,6 +169,13 @@ export const api = {
       orgScoped: false,
     }),
 
+  demoLogin: () =>
+    request<TokenResponse>("/auth/demo", {
+      method: "POST",
+      authed: false,
+      orgScoped: false,
+    }),
+
   me: () => request<User>("/auth/me", { orgScoped: false }),
 
   logout: (refresh_token: string) =>
@@ -249,6 +257,11 @@ export const api = {
 
   dashboardActivity: (limit = 15, days = 30) =>
     request<DashboardActivity>(`/dashboard/activity?limit=${limit}&days=${days}`),
+
+  dashboardCustomerDetail: (stripeCustomerId: string) =>
+    request<CustomerDetail>(
+      `/dashboard/customers/${encodeURIComponent(stripeCustomerId)}`
+    ),
 
   // ---------------------------------------------------------------------------
   // AI weekly review

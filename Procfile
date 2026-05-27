@@ -1,10 +1,11 @@
 # Procfile — process declarations.
 #
-# Render reads this; so does Heroku-style tooling. Documents the
-# three process types this app supports:
+# Render's free tier doesn't support a release/pre-deploy phase, so
+# the actual deploy folds migrations into the web start command (see
+# render.yaml). This Procfile documents the process types for any
+# host that *does* support a release phase (Heroku, paid Render):
 #
-#   release  — runs once per deploy *before* `web` gets traffic.
-#              Perfect spot for migrations.
+#   release  — runs once per deploy before `web` gets traffic.
 #   web      — the FastAPI server. $PORT is injected by the host.
 #   worker   — arq background queue. Optional — only needed if you
 #              use POST /ai/jobs (the synchronous /ai/messages path

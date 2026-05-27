@@ -22,12 +22,23 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, description="Access token expiry in minutes")
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=30, description="Refresh token expiry in days")
     ALGORITHM: str = Field(default="HS256", description="JWT algorithm")
+
+    # Encryption at rest for stored OAuth tokens. Fernet key (urlsafe
+    # base64, 32 bytes). If blank, a key is derived from ACCESS_TOKEN_SECRET.
+    TOKEN_ENCRYPTION_KEY: str = Field(default="", description="Fernet key for encrypting connected-account OAuth tokens at rest. Generate with Fernet.generate_key(). Falls back to a key derived from ACCESS_TOKEN_SECRET when empty.")
     
     # Application
     ENVIRONMENT: str = Field(default="development", description="Environment: development, staging, production")
     API_V1_PREFIX: str = Field(default="/api/v1", description="API version 1 prefix")
     PROJECT_NAME: str = Field(default="InsightPlus", description="Project name")
-    
+
+    # Demo / portfolio mode — a credential-less login into a shared, seeded
+    # account so reviewers can see the dashboard without signing up.
+    DEMO_LOGIN_ENABLED: bool = Field(default=True, description="Expose POST /auth/demo (one-click login into the seeded demo account).")
+    DEMO_USER_EMAIL: str = Field(default="demo@insightplus.com", description="Email of the shared demo account.")
+    DEMO_USER_USERNAME: str = Field(default="demo", description="Username of the shared demo account.")
+    DEMO_USER_PASSWORD: str = Field(default="insightplus-demo", description="Password for the shared demo account (public by design).")
+
     # CORS
     CORS_ORIGINS: str = Field(default="http://localhost:3000", description="Allowed CORS origins (comma-separated)")
 

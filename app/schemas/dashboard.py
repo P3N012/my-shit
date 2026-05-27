@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class KpiDelta(BaseModel):
@@ -75,3 +75,44 @@ class ActivityEventResponse(BaseModel):
 
 class ActivityResponse(BaseModel):
     events: List[ActivityEventResponse]
+
+
+class CustomerSubscription(BaseModel):
+    stripe_subscription_id: str
+    status: str
+    currency: Optional[str]
+    amount_per_period: int
+    interval: Optional[str]
+    interval_count: int
+    current_period_end: Optional[datetime]
+    cancel_at_period_end: bool
+    canceled_at: Optional[datetime]
+    started_at: Optional[datetime]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CustomerCharge(BaseModel):
+    stripe_charge_id: str
+    amount: int
+    amount_refunded: int
+    currency: str
+    status: str
+    paid: bool
+    refunded: bool
+    stripe_created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CustomerDetailResponse(BaseModel):
+    stripe_customer_id: str
+    name: Optional[str]
+    email: Optional[str]
+    currency: Optional[str]
+    delinquent: bool
+    stripe_created_at: datetime
+    current_mrr_cents: int
+    lifetime_value_cents: int
+    subscriptions: List[CustomerSubscription]
+    charges: List[CustomerCharge]

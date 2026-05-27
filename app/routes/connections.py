@@ -40,11 +40,13 @@ from app.schemas.platform_connection import (
     ConnectionResponse,
     CustomerSummary,
     DisconnectResponse,
+    StripeApiKeyConnectRequest,
     StripeOAuthInitResponse,
     SubscriptionSummary,
     SyncLogResponse,
     SyncTriggerResponse,
 )
+from app.services.stripe_apikey_service import StripeApiKeyService
 from app.services.stripe_oauth_service import StripeOAuthService
 from app.services.stripe_sync_service import StripeSyncService
 from app.utils.dependencies import get_current_membership
@@ -75,6 +77,36 @@ def stripe_connect(
             detail="Stripe Connect is not configured on this server.",
         )
     return StripeOAuthInitResponse(authorization_url=url, state=state)
+
+
+@router.post(
+    "/stripe/api-key",
+    response_model=ConnectionResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={400: {"description": "Invalid or non-restricted key"}},
+)
+def stripe_connect_api_key(
+    payload: StripeApiKeyConnectRequest,
+    membership: Membership = Depends(get_current_membership),
+    db: Session = Depends(get_db),
+):
+    """
+    Connect a Stripe account with a read-only restricted API key (`rk_…`).
+
+    The trust-first alternative to OAuth: the user controls exactly what
+    the key can read and can revoke it from their own Stripe dashboard.
+    Full secret keys (`sk_…`) are rejected.
+    """
+    try:
+        connection = StripeApiKeyService.connect(
+            db,
+            user_id=membership.user_id,
+            organization_id=membership.organization_id,
+            api_key=payload.api_key,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return ConnectionResponse.model_validate(connection)
 
 
 @router.get(

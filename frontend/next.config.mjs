@@ -13,7 +13,14 @@ const nextConfig = {
     outputFileTracingRoot: __dirname,
   },
   async rewrites() {
-    const backend = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+    // Trim whitespace and any trailing slash — a stray space in the
+    // NEXT_PUBLIC_API_BASE_URL env var otherwise produces a rewrite
+    // destination like " https://..." which Next rejects at build time
+    // ("Invalid rewrite found"), and a trailing slash produces a
+    // double slash in the proxied path.
+    const backend = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000")
+      .trim()
+      .replace(/\/+$/, "");
     return [
       {
         source: "/api/v1/:path*",

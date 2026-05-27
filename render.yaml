@@ -18,8 +18,11 @@ services:
     plan: free
     autoDeploy: true                # redeploy on every push to main
     buildCommand: pip install -r requirements.txt
-    preDeployCommand: alembic upgrade head
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    # Free tier doesn't support preDeployCommand, so migrations run as
+    # part of the start command. `alembic upgrade head` is idempotent —
+    # it only applies pending migrations and no-ops otherwise, so it's
+    # safe to run on every boot (including after a free-tier sleep wake).
+    startCommand: alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
 
     envVars:

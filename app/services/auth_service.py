@@ -72,6 +72,29 @@ class AuthService:
         return user
 
     @staticmethod
+    def ensure_demo_user(db: Session) -> User:
+        """
+        Find or create the shared demo account used by the one-click demo
+        login. Idempotent: returns the existing user if it's already there,
+        otherwise registers it (which also creates its personal org). The
+        seed script calls this before seeding so the demo account gets the
+        full synthetic dataset.
+        """
+        existing = (
+            db.query(User)
+            .filter(User.email == settings.DEMO_USER_EMAIL)
+            .first()
+        )
+        if existing:
+            return existing
+        return AuthService.register_user(
+            db=db,
+            email=settings.DEMO_USER_EMAIL,
+            username=settings.DEMO_USER_USERNAME,
+            password=settings.DEMO_USER_PASSWORD,
+        )
+
+    @staticmethod
     def authenticate_user(
         db: Session,
         email: str,

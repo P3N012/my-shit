@@ -8,7 +8,7 @@ Dashboard aggregates. All org-scoped via `X-Organization-Id`.
   GET /dashboard/activity        Recent account activity feed
 """
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -16,6 +16,9 @@ from app.models.organization import Membership
 from app.schemas.dashboard import (
     ActivityEventResponse,
     ActivityResponse,
+    CustomerCharge,
+    CustomerDetailResponse,
+    CustomerSubscription,
     KpiDelta,
     MovementPoint,
     MovementsResponse,
@@ -123,6 +126,35 @@ def movements(
             )
             for p in points
         ]
+    )
+
+
+@router.get(
+    "/customers/{stripe_customer_id}",
+    response_model=CustomerDetailResponse,
+    responses={404: {"description": "Customer not found in this org"}},
+)
+def customer_detail(
+    stripe_customer_id: str,
+    membership: Membership = Depends(get_current_membership),
+    db: Session = Depends(get_db),
+):
+    detail = DashboardService.customer_detail(
+        db, membership.organization_id, stripe_customer_id
+    )
+    if detail is None:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return CustomerDetailResponse(
+        stripe_customer_id=detail.stripe_customer_id,
+        name=detail.name,
+        email=detail.email,
+        currency=detail.currency,
+        delinquent=detail.delinquent,
+        stripe_created_at=detail.stripe_created_at,
+        current_mrr_cents=detail.current_mrr_cents,
+        lifetime_value_cents=detail.lifetime_value_cents,
+        subscriptions=[CustomerSubscription.model_validate(s) for s in detail.subscriptions],
+        charges=[CustomerCharge.model_validate(c) for c in detail.charges],
     )
 
 

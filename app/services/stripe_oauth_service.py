@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.platform_connection import (
+    AUTH_OAUTH,
     CONN_ACTIVE,
     PLATFORM_STRIPE,
     OAuthState,
@@ -209,7 +210,14 @@ class StripeOAuthService:
         if conn is None:
             return False
 
-        if conn.platform == PLATFORM_STRIPE and settings.STRIPE_SECRET_KEY:
+        # Only OAuth/Connect grants are revoked at Stripe. Restricted-key
+        # connections are revoked by the user in their own dashboard; we
+        # just drop our copy of the key.
+        if (
+            conn.platform == PLATFORM_STRIPE
+            and conn.auth_method == AUTH_OAUTH
+            and settings.STRIPE_SECRET_KEY
+        ):
             try:
                 stripe.api_key = settings.STRIPE_SECRET_KEY
                 stripe.OAuth.deauthorize(
