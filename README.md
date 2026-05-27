@@ -47,7 +47,7 @@ background sync, and a deployed pipeline across three cloud providers.
 
 ---
 
-##  Highlights
+## Highlights
 
 - **Real revenue math, not placeholders.** MRR is normalised across
   billing intervals (daily/weekly/monthly/yearly → monthly cents);
@@ -76,7 +76,7 @@ background sync, and a deployed pipeline across three cloud providers.
 
 ---
 
-##  Screenshots
+## Screenshots
 
 | Dashboard | MRR movements & quick ratio |
 | --- | --- |
@@ -88,7 +88,7 @@ background sync, and a deployed pipeline across three cloud providers.
 
 ---
 
-##  Architecture
+## Architecture
 
 ```mermaid
 flowchart LR
@@ -120,7 +120,7 @@ flowchart LR
 
 ---
 
-##  Running locally
+## Running locally
 
 **Backend** (Python 3.12 recommended):
 
